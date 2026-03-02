@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <title>Pocket Monsters Battle</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<!-- ── LOBBY SCREEN ─────────────────────────────────────────────────────────── -->
+<div id="lobby-screen" class="screen active">
+  <div class="lobby-bg"></div>
+  <div class="lobby-content">
+    <div class="title-box">
+      <div class="title-pokeball"></div>
+      <h1 class="game-title">Pocket<br/>Monsters<br/><span>Battle</span></h1>
+      <p class="game-subtitle" data-i18n="subtitle">集结最强阵容，决战宝可梦擂台！</p>
+      <button class="btn-lang" id="btn-lang">English</button>
+    </div>
+
+    <div class="lobby-card">
+      <div class="input-row">
+        <label data-i18n="trainerName">训练家名称</label>
+        <input id="player-name-input" type="text" maxlength="12" placeholder="输入你的名字…" data-i18n-placeholder="namePlaceholder" />
+      </div>
+
+      <div class="lobby-buttons">
+        <button class="btn btn-red" id="btn-create-room" data-i18n="createRoom">创建擂台</button>
+        <div class="divider" data-i18n="or">或</div>
+        <div class="join-row">
+          <input id="room-code-input" type="text" maxlength="6" placeholder="擂台码" data-i18n-placeholder="roomCode" style="text-transform:uppercase" />
+          <button class="btn btn-blue" id="btn-join-room" data-i18n="joinRoom">加入擂台</button>
+        </div>
+      </div>
+
+      <div class="room-list-section">
+        <h3 data-i18n="openArenas">🏟️ 开放的擂台</h3>
+        <div id="room-list" class="room-list">
+          <p class="empty-hint" data-i18n="noRooms">暂无开放擂台…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── GAME SCREEN ─────────────────────────────────────────────────────────── -->
+<div id="game-screen" class="screen">
+
+  <!-- Header bar -->
+  <header class="game-header">
+    <div class="game-logo">⚔️ Pocket Monsters Battle</div>
+    <div class="room-info">
+      <span data-i18n="arena">擂台</span>: <span id="hdr-room-id"></span>
+      &nbsp;|&nbsp; <span id="hdr-phase"></span>
+      &nbsp;|&nbsp; <span data-i18n="prize">奖池</span>:
+        <span id="hdr-pot" class="gold">0</span>
+        <span data-i18n="coins">金币</span>      &nbsp;|  <span id="hdr-blind-info" class="hdr-blind-info">盲注: 10/20 · 第 0 局</span>    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn-lang" id="btn-lang-game">English</button>
+      <!-- Volume control -->
+      <button class="btn-vol" id="btn-vol" title="BGM">🎵</button>
+      <div class="vol-panel hidden" id="vol-panel">
+        <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="0.35" />
+        <span id="vol-value">35%</span>
+      </div>
+      <button class="btn btn-sm btn-gray" id="btn-leave" data-i18n="leave">离开</button>
+    </div>
+  </header>
+
+  <div class="game-layout">
+
+    <!-- LEFT: opponent slots (top half) -->
+    <div class="opponents-area" id="opponents-area"></div>
+
+    <!-- CENTER: battle arena -->
+    <div class="table-area">
+      <div class="battle-arena">
+        <div class="arena-field-top"></div>
+        <div class="arena-center">
+          <div class="arena-pokeball">
+            <div class="pokeball-top"></div>
+            <div class="pokeball-mid"></div>
+            <div class="pokeball-bottom"></div>
+            <div class="pokeball-btn"></div>
+          </div>
+          <div id="community-cards" class="community-cards"></div>
+        </div>
+        <div class="arena-field-bottom"></div>
+      </div>
+      <div id="pot-display" class="pot-display">
+        <span data-i18n="prize">奖池</span>: <strong>0</strong>
+        <span data-i18n="coins">金币</span>
+      </div>
+    </div>
+
+    <!-- RIGHT / BOTTOM: my area -->
+    <div class="my-area">
+      <div class="my-info-bar">
+        <span id="my-name" class="my-name">训练家</span>
+        <span id="my-chips" class="chip-count">1000 金币</span>
+      </div>
+
+      <!-- Power HUD: rank + power, shown when hand is evaluatable -->
+      <div id="power-hud" class="power-hud hidden">
+        <div id="power-hud-rank" class="power-hud-rank"></div>
+        <div id="power-hud-power" class="power-hud-power"></div>
+      </div>
+
+      <div id="my-cards" class="my-cards"></div>
+
+      <!-- Action panel -->
+      <div id="action-panel" class="action-panel hidden">
+        <div class="call-info">
+          <span data-i18n="battleCost">迎战费</span>:
+          <span id="call-amount">0</span>
+          <span data-i18n="coins">金币</span>
+        </div>
+        <div class="action-buttons">
+          <button class="btn btn-gray"   id="btn-fold"  data-i18n="fold">撤  退</button>
+          <button class="btn btn-blue"   id="btn-check" data-i18n="check">蓄  力</button>
+          <button class="btn btn-green"  id="btn-call"  data-i18n="call">迎  战</button>
+          <button class="btn btn-red"    id="btn-raise" data-i18n="raise">强  化</button>
+          <button class="btn btn-purple" id="btn-allin" data-i18n="allin">决一死战</button>
+        </div>
+        <div class="raise-row">
+          <input id="raise-input" type="range" min="20" max="1000" step="10" value="40" />
+          <span id="raise-value">40</span>
+          <span data-i18n="coins">金币</span>
+        </div>
+      </div>
+
+      <!-- Host start button -->
+      <div id="start-panel" class="start-panel hidden">
+        <p id="waiting-msg" class="waiting-msg" data-i18n="waitHost">等待房主开始对战…</p>
+        <button class="btn btn-red btn-lg" id="btn-start" data-i18n="startBattle">⚔️ 开始对战！</button>
+      </div>
+    </div>
+
+  </div><!-- end game-layout -->
+
+  <!-- Player list sidebar -->
+  <div class="player-sidebar" id="player-sidebar"></div>
+
+</div><!-- end game-screen -->
+
+<!-- ── BGM ──────────────────────────────────────────────────────────────────── -->
+<audio id="bgm" loop preload="none">
+  <source src="https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/25.ogg" type="audio/ogg" />
+</audio>
+
+<!-- ── SHOWDOWN OVERLAY ──────────────────────────────────────────────────────── -->
+<div id="showdown-overlay" class="overlay hidden">
+  <div class="overlay-box">
+    <h2 id="showdown-title" data-i18n="battleResult">⚔️ 决战结果</h2>
+    <div id="showdown-content"></div>
+    <p class="countdown-text">
+      <span data-i18n="nextRound">下一局即将开始</span>… <span id="countdown">8</span>
+    </p>
+  </div>
+</div>
+<!-- ── FINAL CHAMPION OVERLAY ────────────────────────────────────────────────── -->
+<div id="champion-overlay" class="overlay hidden champ-overlay">
+  <div class="champ-box">
+    <div class="champ-stars" aria-hidden="true"></div>
+    <div id="champ-title" class="champ-title">🏆</div>
+    <div id="champ-sub"   class="champ-sub"></div>
+    <div id="champ-rounds" class="champ-rounds"></div>
+    <div id="champ-mons"  class="champ-mons"></div>
+    <button id="champ-back-btn" class="btn btn-gold btn-lg champ-back">🏠 返回大厅</button>
+  </div>
+</div>
+<!-- ── ERROR TOAST ──────────────────────────────────────────────────────────── -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- Scripts -->
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/gameLogic.js"></script>
+<script src="js/client.js"></script>
+</body>
+</html>
