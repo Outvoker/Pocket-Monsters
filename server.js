@@ -65,6 +65,7 @@ class RoomState {
         handCount: p.hand ? p.hand.length : 0,
         hand:     (this.phase === GL.PHASES.SHOWDOWN || p.id === forPlayerId) ? p.hand : null,
         bestHand: (this.phase === GL.PHASES.SHOWDOWN) ? p.bestHand : null,
+        isBot:    !!p.isBot,
       })),
     };
   }
@@ -72,7 +73,138 @@ class RoomState {
 
 function makePlayer(id, name) {
   return { id, name, chips:1000, hand:[], folded:false, allIn:false,
-           bet:0, totalBet:0, connected:true, bestHand:null };
+           bet:0, totalBet:0, connected:true, bestHand:null, isBot:false };
+}
+
+// ─── Bot helpers ─────────────────────────────────────────────────────────────
+const BOT_NAMES = ['小智','小霞','小刚','大木博士','火箭队喵喵','小次郎','小兰','阿桂'];
+
+function isBotId(id) { return typeof id === 'string' && id.startsWith('BOT_'); }
+
+function makeBotPlayer(name) {
+  const id = 'BOT_' + Math.random().toString(36).substring(2, 8).toUpperCase();
+  return { id, name, chips:1000, hand:[], folded:false, allIn:false,
+           bet:0, totalBet:0, connected:true, bestHand:null, isBot:true };
+}
+
+/**
+ * Simple bot AI: returns { action, amount? }
+ * - Evaluates hand strength from 0..1
+ * - Strong hands: raise/call aggressively
+ * - Medium: call or check
+ * - Weak: fold or check
+ */
+function botDecide(room, bot) {
+  const toCall = Math.max(0, room.currentBet - bot.bet);
+
+  // Estimate hand strength 0..1
+  let strength = 0.35;
+  if (bot.hand && bot.hand.length >= 2) {
+    const allCards = [...bot.hand, ...room.community];
+    if (allCards.length >= 5) {
+      const result = GL.evaluateBestHand(allCards);
+      strength = result.rank / 9;           // rank 0-9 → 0..1
+    } else {
+      // pre-flop: use average card value as proxy
+      const avg = bot.hand.reduce((s, c) => s + c.value, 0) / bot.hand.length;
+      strength = avg / 13;
+    }
+  }
+
+  const r = Math.random();
+  const bb = room.bigBlind;
+
+  if (strength > 0.6) {             // strong hand
+    if (r < 0.08) return { action: GL.ACTIONS.FOLD };
+    if (r < 0.50) {
+      const minR = room.currentBet + bb;
+      const maxR = bot.bet + bot.chips;
+      if (minR < maxR) {
+        const amt = Math.min(minR + Math.floor(Math.random() * bb * 3), maxR);
+        return { action: GL.ACTIONS.RAISE, amount: amt };
+      }
+    }
+    if (toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
+    return { action: GL.ACTIONS.ALLIN };
+  }
+
+  if (strength > 0.30) {            // medium hand
+    if (toCall === 0) return { action: r < 0.15 ? GL.ACTIONS.RAISE : GL.ACTIONS.CHECK };
+    if (r < 0.30) return { action: GL.ACTIONS.FOLD };
+    if (toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
+    return { action: GL.ACTIONS.FOLD };
+  }
+
+  // weak hand
+  if (toCall === 0) return { action: GL.ACTIONS.CHECK };
+  if (r < 0.65) return { action: GL.ACTIONS.FOLD };
+  if (toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
+  return { action: GL.ACTIONS.FOLD };
+}
+
+function executeBotAction(room, bot) {
+  if (room.phase === GL.PHASES.WAITING || room.phase === GL.PHASES.SHOWDOWN) return;
+  if (bot.folded || bot.allIn || bot.spectator) return;
+
+  const { action, amount } = botDecide(room, bot);
+  const toCall = Math.max(0, room.currentBet - bot.bet);
+
+  switch (action) {
+    case GL.ACTIONS.FOLD:
+      bot.folded = true;
+      room.needsToAct.delete(bot.id);
+      break;
+    case GL.ACTIONS.CHECK:
+      room.needsToAct.delete(bot.id);
+      break;
+    case GL.ACTIONS.CALL:
+      addBet(room, bot, Math.min(toCall, bot.chips));
+      room.needsToAct.delete(bot.id);
+      break;
+    case GL.ACTIONS.RAISE: {
+      if (amount && amount > room.currentBet) {
+        const diff = amount - bot.bet;
+        addBet(room, bot, Math.min(diff, bot.chips));
+        room.currentBet = bot.bet;
+        room.needsToAct = new Set(room.activePlayers().filter(p => p.id !== bot.id).map(p => p.id));
+      } else {
+        room.needsToAct.delete(bot.id);
+      }
+      break;
+    }
+    case GL.ACTIONS.ALLIN: {
+      const all = bot.chips;
+      const newTotal = bot.bet + all;
+      addBet(room, bot, all);
+      if (newTotal > room.currentBet) {
+        room.currentBet = newTotal;
+        room.needsToAct = new Set(room.activePlayers().filter(p => p.id !== bot.id).map(p => p.id));
+      } else {
+        room.needsToAct.delete(bot.id);
+      }
+      break;
+    }
+  }
+  checkAndAdvance(room);
+}
+
+function scheduleBotAction(room) {
+  const current = room.players[room.turnIndex];
+  if (!current || !current.isBot) return;
+  if (room.phase === GL.PHASES.WAITING || room.phase === GL.PHASES.SHOWDOWN) return;
+  if (current.folded || current.allIn || current.spectator) return;
+
+  const delay = 900 + Math.random() * 1400;   // 0.9-2.3 s think time
+  const roomId = room.id;
+  const botId  = current.id;
+  setTimeout(() => {
+    const r = rooms[roomId];
+    if (!r) return;
+    const bot = r.players[r.turnIndex];
+    if (!bot || !bot.isBot || bot.id !== botId) return;  // turn moved on
+    if (r.phase === GL.PHASES.WAITING || r.phase === GL.PHASES.SHOWDOWN) return;
+    executeBotAction(r, bot);
+  }, delay);
 }
 function addBet(room, player, amount) {
   player.chips -= amount; player.bet += amount;
@@ -87,9 +219,11 @@ function getRoomList() {
 }
 function emitGameState(room) {
   for (const p of room.players) {
+    if (isBotId(p.id)) continue;
     const sock = io.sockets.sockets.get(p.id);
     if (sock) sock.emit('game_state', room.publicState(p.id));
   }
+  scheduleBotAction(room);
 }
 
 function postBlind(room, player, amount) {
@@ -294,6 +428,32 @@ io.on('connection', socket => {
     socket.join(roomId);
     socket.emit('room_joined', { roomId, playerId: socket.id });
     emitGameState(room); broadcastRoomList();
+  });
+
+  socket.on('add_bot', ({ roomId }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    if (room.hostId !== socket.id) return socket.emit('error', { msg: '只有房主才能添加机器人' });
+    if (room.phase !== GL.PHASES.WAITING) return socket.emit('error', { msg: '只能在等待阶段添加机器人' });
+    if (room.players.length >= room.maxPlayers) return socket.emit('error', { msg: '房间已满' });
+    const usedNames = new Set(room.players.map(p => p.name));
+    const available = BOT_NAMES.filter(n => !usedNames.has(n));
+    const botName = available.length ? available[0] : `机器人${room.players.length}`;
+    room.players.push(makeBotPlayer(botName));
+    emitGameState(room);
+    broadcastRoomList();
+  });
+
+  socket.on('remove_bot', ({ roomId }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    if (room.hostId !== socket.id) return socket.emit('error', { msg: '只有房主才能移除机器人' });
+    if (room.phase !== GL.PHASES.WAITING) return socket.emit('error', { msg: '只能在等待阶段移除机器人' });
+    const lastBotIdx = [...room.players].reverse().findIndex(p => p.isBot);
+    if (lastBotIdx === -1) return socket.emit('error', { msg: '没有可移除的机器人' });
+    room.players.splice(room.players.length - 1 - lastBotIdx, 1);
+    emitGameState(room);
+    broadcastRoomList();
   });
 
   socket.on('start_game', ({ roomId }) => {

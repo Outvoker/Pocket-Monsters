@@ -243,6 +243,9 @@ input[type="text"]:focus, input[type="number"]:focus {
 .btn-gold   { background: var(--gold);   color: #000; }
 .btn-sm     { padding: 6px 14px; font-size: 12px; }
 .btn-lg     { padding: 14px 32px; font-size: 16px; }
+.btn-ghost  { background: transparent; color: var(--text-secondary, #aaa);
+              border: 1px solid rgba(255,255,255,.25); }
+.btn-ghost:hover { background: rgba(255,255,255,.08); }
 
 /* ─── GAME SCREEN ─────────────────────────────────────────────────────────── */
 #game-screen {
@@ -741,6 +744,8 @@ input[type="range"] {
   gap: 12px;
 }
 .waiting-msg { font-size: 13px; color: #aaa; text-align: center; }
+.bot-controls { display: flex; gap: 8px; }
+.opponent-slot.is-bot .opp-name { opacity: .85; }
 
 /* ─── Player sidebar ──────────────────────────────────────────────────────── */
 .player-sidebar {

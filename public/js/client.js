@@ -313,6 +313,7 @@
 
       const slot = document.createElement('div');
       slot.className = `opponent-slot ${p.folded ? 'folded' : ''} ${isActive ? 'is-turn' : ''}`;
+      if (p.isBot) slot.classList.add('is-bot');
 
       const cardsHtml = p.hand && p.hand.length
         ? `<div class="opp-back-cards">${p.hand.map(c => miniMonHtml(c)).join('')}</div>`
@@ -324,7 +325,7 @@
       slot.innerHTML = `
         ${cardsHtml}
         <div class="opp-info">
-          <div class="opp-name">${escHtml(p.name)} ${statusHtml}</div>
+          <div class="opp-name">${p.isBot ? '🤖 ' : ''}${escHtml(p.name)} ${statusHtml}</div>
           <div class="opp-chips">${p.chips} ${t('coins')}</div>
           ${betHtml}
           ${p.bestHand ? `<div style="font-size:10px;color:#aaa">${escHtml(p.bestHand.rankLabel)}</div>` : ''}
@@ -385,10 +386,13 @@
       $('start-panel').classList.remove('hidden');
       if (amHost) {
         $('btn-start').classList.remove('hidden');
-        $('waiting-msg').textContent = t('playerCount', state.players.length, state.maxPlayers || 6);
+        $('waiting-msg').textContent = t('playerCount', state.players.length, state.maxPlayers || 8);
         $('btn-start').disabled = state.players.filter(p => p.chips > 0).length < 2;
+        $('bot-controls').classList.remove('hidden');
+        $('btn-remove-bot').disabled = !state.players.some(p => p.isBot);
       } else {
         $('btn-start').classList.add('hidden');
+        $('bot-controls').classList.add('hidden');
         $('waiting-msg').textContent = t('waitHost');
       }
       return;
@@ -440,7 +444,7 @@
       const div = document.createElement('div');
       div.className = `sidebar-player ${p.folded ? 'folded' : ''} ${isActive ? 'is-turn' : ''}`;
       div.innerHTML = `
-        <div class="sidebar-player-name">${isDealer ? '🎖️ ' : ''}${escHtml(p.name)}${p.id === myId ? ' (Me)' : ''}</div>
+        <div class="sidebar-player-name">${isDealer ? '🎖️ ' : ''}${p.isBot ? '🤖 ' : ''}${escHtml(p.name)}${p.id === myId ? ' (Me)' : ''}</div>
         <div class="sidebar-player-chips">${p.chips} ${t('coins')}</div>
         ${p.bet ? `<div style="font-size:10px;color:#78909c">${p.bet}</div>` : ''}`;
       sb.appendChild(div);
@@ -659,7 +663,9 @@
   $('btn-allin').addEventListener('click', () => emitAction(GL.ACTIONS.ALLIN));
   $('btn-raise').addEventListener('click', () => emitAction(GL.ACTIONS.RAISE, parseInt($('raise-input').value, 10)));
   $('raise-input').addEventListener('input', () => { $('raise-value').textContent = $('raise-input').value; });
-  $('btn-start').addEventListener('click', () => socket.emit('start_game', { roomId: myRoomId }));
+  $('btn-start').addEventListener('click',      () => socket.emit('start_game',  { roomId: myRoomId }));
+  $('btn-add-bot').addEventListener('click',    () => socket.emit('add_bot',      { roomId: myRoomId }));
+  $('btn-remove-bot').addEventListener('click', () => socket.emit('remove_bot',   { roomId: myRoomId }));
 
   // ─── BGM ──────────────────────────────────────────────────────────────────────
   (function initBgm() {
