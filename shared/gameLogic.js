@@ -187,9 +187,11 @@ function evaluateHand(cards) {
   }
 
   const rankInfo = RANK_MAP[rankKey];
-  // Bonus power: add top-card values contribution
+  // Bonus power: weighted sum of top-5 card values sorted by frequency/strength
+  // Max possible bonus = 13*5 + 13*4 + 13*3 + 13*2 + 13*1 = 195
+  // Base = rank * 200, guaranteeing higher rank ALWAYS beats lower rank regardless of bonus
   const highCardBonus = sortedByFreq.slice(0, 5).reduce((s, v, i) => s + v * (5 - i), 0);
-  const totalPower = rankInfo.power + highCardBonus;
+  const totalPower = rankInfo.rank * 200 + highCardBonus;
 
   return {
     rankKey,

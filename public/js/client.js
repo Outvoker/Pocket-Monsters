@@ -670,8 +670,8 @@
     if (!bgm) return;
 
     // ↓↓ 两个场景的 BGM ↓↓
-    const BGM_LOBBY  = '/audio/op.mp3';                                                // 大厅/等待 BGM
-    const BGM_BATTLE = 'https://play.pokemonshowdown.com/audio/hgss-johto-trainer.mp3'; // 游戏中对战 BGM
+    const BGM_LOBBY  = '/audio/op.mp3';                    // 大厅/等待 BGM
+    const BGM_BATTLE = '/audio/hgss-johto-trainer.mp3';   // 游戏中对战 BGM
 
     let currentBgmUrl = null;
     let userInteracted = false;
