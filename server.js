@@ -450,7 +450,7 @@ function endGame(room, winners) {
         room.dealerIdx = (room.dealerIdx + 1) % room.players.length;
       startGame(room);
     }
-  }, 9000);
+  }, 15000);
 }
 
 // Close a room if no human (non-bot) players remain

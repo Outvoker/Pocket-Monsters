@@ -271,6 +271,10 @@
     const classMap   = { waiting:'phase-waiting', preflop:'phase-preflop', flop:'phase-flop',
                          turn:'phase-turn', river:'phase-river', showdown:'phase-showdown' };
     $('hdr-phase').innerHTML = `<span class="phase-badge ${classMap[phaseKey]||''}">${escHtml(phaseLabel)}</span>`;
+    const phaseBanner = $('phase-banner');
+    if (phaseBanner) {
+      phaseBanner.innerHTML = `<span class="phase-badge phase-badge-big ${classMap[phaseKey]||""}">${escHtml(phaseLabel)}</span>`;
+    }
     $('hdr-pot').textContent = state.pot;
     $('pot-display').innerHTML = `<span>${t('prize')}</span>: <strong>${state.pot}</strong> <span>${t('coins')}</span>`;
     // Blind level & round indicator
@@ -460,10 +464,9 @@
 
     const minRaise = state.currentBet + (state.bigBlind || 20);
     const maxRaise = me.chips + (me.bet || 0);
-    $('raise-input').min   = minRaise;
+    $('raise-input').min   = 0;
     $('raise-input').max   = maxRaise;
     $('raise-input').value = Math.min(minRaise * 2, maxRaise);
-    $('raise-value').textContent = $('raise-input').value;
   }
 
   // ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -490,6 +493,16 @@
   const countdownEl      = $('countdown');
 
   function showShowdown(state) {
+    // Always reset countdown on every showdown trigger
+    let secs = 15;
+    countdownEl.textContent = secs;
+    clearInterval(countdownTimer);
+    countdownTimer = setInterval(() => {
+      secs--;
+      countdownEl.textContent = secs;
+      if (secs <= 0) clearInterval(countdownTimer);
+    }, 1000);
+
     if (showdownOverlay._shown) return;
     showdownOverlay._shown = true;
     showdownOverlay.classList.remove('hidden');
@@ -541,10 +554,14 @@
     // ── Per-player chip change table ──
     if (state.roundResults && state.roundResults.length) {
       const winnerIds = new Set(winners.map(w => w.id));
+      // Sort by chips descending (overall ranking)
+      const sorted = [...state.roundResults].sort((a, b) => b.chips - a.chips);
       html += '<div class="round-results">';
       html += `<div class="round-results-title">${lang === 'zh' ? '本局金币变化' : 'Chip Changes'}</div>`;
       html += '<div class="round-results-list">';
-      state.roundResults.forEach(r => {
+      sorted.forEach((r, idx) => {
+        const place = idx + 1;
+        const placeStr = place === 1 ? '🥇' : place === 2 ? '🥈' : place === 3 ? '🥉' : `#${place}`;
         const isWinner = winnerIds.has(r.id);
         const deltaStr = (r.delta >= 0 ? '+' : '') + r.delta;
         const deltaClass = r.delta > 0 ? 'delta-pos' : r.delta < 0 ? 'delta-neg' : 'delta-zero';
@@ -555,6 +572,7 @@
           ? ` · ${escHtml(r.bestHand.rankLabel)} ⚡${powerStr}`
           : r.folded ? ` · (${t('folded')})` : '';
         html += `<div class="round-result-row${isWinner ? ' is-winner' : ''}">
+          <span class="rr-place">${placeStr}</span>
           <span class="rr-name">${r.isBot ? '🤖 ' : ''}${escHtml(r.name)}${isWinner ? ' 🏆' : ''}${rankStr}</span>
           <span class="rr-delta ${deltaClass}">${deltaStr}</span>
           <span class="rr-chips">= ${r.chips} ${t('coins')}</span>
@@ -575,15 +593,6 @@
     showdownContent.innerHTML = html;
 
     requestAnimationFrame(() => spawnSparkles(overlayBox));
-
-    let secs = 9;
-    countdownEl.textContent = secs;
-    clearInterval(countdownTimer);
-    countdownTimer = setInterval(() => {
-      secs--;
-      countdownEl.textContent = secs;
-      if (secs <= 0) clearInterval(countdownTimer);
-    }, 1000);
   }
 
   function hideShowdown() {
@@ -654,7 +663,7 @@
       ? { fire:'火系', water:'水系', grass:'草系', electric:'电系' }[card.type]
       : card.type.charAt(0).toUpperCase() + card.type.slice(1))
       : '';
-    return `<div class="showdown-mon-big${inBest ? ' in-best' : ''}" style="animation-delay:${delay}ms">
+    return `<div class="showdown-mon-big${inBest ? ' in-best' : ' not-best'}" style="animation-delay:${delay}ms">
       <div class="showdown-mon-big-val">${valLabel}</div>
       <img src="${GL.spriteUrl(card.id)}" alt="${escHtml(getMonName(card))}" />
       <div class="showdown-mon-big-name" style="color:${color}">${escHtml(getMonName(card))}</div>
@@ -717,8 +726,32 @@
   $('btn-check').addEventListener('click', () => emitAction(GL.ACTIONS.CHECK));
   $('btn-call').addEventListener('click',  () => emitAction(GL.ACTIONS.CALL));
   $('btn-allin').addEventListener('click', () => emitAction(GL.ACTIONS.ALLIN));
-  $('btn-raise').addEventListener('click', () => emitAction(GL.ACTIONS.RAISE, parseInt($('raise-input').value, 10)));
-  $('raise-input').addEventListener('input', () => { $('raise-value').textContent = $('raise-input').value; });
+  $('btn-raise').addEventListener('click', () => {
+    const el = $('raise-input');
+    const v  = parseInt(el.value, 10);
+    const mn = parseInt(el.min, 10) || 0;
+    const mx = parseInt(el.max, 10) || 99999;
+    if (isNaN(v) || v < mn || v > mx) {
+      el.style.borderColor = '#ef5350';
+      setTimeout(() => { el.style.borderColor = ''; }, 1500);
+      return;
+    }
+    el.style.borderColor = '';
+    emitAction(GL.ACTIONS.RAISE, v);
+  });
+  $('raise-input').addEventListener('input', () => {
+    $('raise-input').style.borderColor = '';
+  });
+  document.querySelectorAll('.raise-quick').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el  = $('raise-input');
+      const add = parseInt(btn.dataset.add, 10);
+      const cur = parseInt(el.value, 10) || 0;
+      const mx  = parseInt(el.max, 10) || 99999;
+      el.value = Math.min(cur + add, mx);
+      el.style.borderColor = '';
+    });
+  });
   $('btn-start').addEventListener('click',      () => socket.emit('start_game',  { roomId: myRoomId }));
   $('btn-add-bot').addEventListener('click',    () => socket.emit('add_bot',      { roomId: myRoomId }));
   $('btn-remove-bot').addEventListener('click', () => socket.emit('remove_bot',   { roomId: myRoomId }));
