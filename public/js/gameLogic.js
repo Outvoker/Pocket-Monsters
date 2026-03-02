@@ -40,7 +40,7 @@ const POKEMON_DATA = {
     { id: 8,   name: 'Wartortle',  zhName: '甲壳龟',     value: 8  },
     { id: 121, name: 'Starmie',    zhName: '星形宝石',   value: 9  },
     { id: 134, name: 'Vaporeon',   zhName: '水伊布',     value: 10 },
-    { id: 131, name: 'Lapras',     zhName: '拉普拉斯',   value: 11 },
+    { id: 131, name: 'Lapras',     zhName: '乘龙',       value: 11 },
     { id: 130, name: 'Gyarados',   zhName: '暴鲤龙',     value: 12 },
     { id: 9,   name: 'Blastoise',  zhName: '水箭龟',     value: 13 },
   ],

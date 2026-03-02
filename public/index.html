@@ -57,8 +57,10 @@
       &nbsp;|&nbsp; <span data-i18n="prize">奖池</span>:
         <span id="hdr-pot" class="gold">0</span>
         <span data-i18n="coins">金币</span>      &nbsp;|  <span id="hdr-blind-info" class="hdr-blind-info">盲注: 10/20 · 第 0 局</span>    </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div class="game-header-btns" style="display:flex;gap:8px;align-items:center">
       <button class="btn-lang" id="btn-lang-game">English</button>
+      <!-- Help -->
+      <button class="btn-help" id="btn-help" title="帮助">?</button>
       <!-- Volume control -->
       <button class="btn-vol" id="btn-vol" title="BGM">🎵</button>
       <div class="vol-panel hidden" id="vol-panel">
@@ -85,13 +87,13 @@
             <div class="pokeball-bottom"></div>
             <div class="pokeball-btn"></div>
           </div>
+          <div id="pot-display" class="pot-display">
+            <span data-i18n="prize">奖池</span>: <strong>0</strong>
+            <span data-i18n="coins">金币</span>
+          </div>
           <div id="community-cards" class="community-cards"></div>
         </div>
         <div class="arena-field-bottom"></div>
-      </div>
-      <div id="pot-display" class="pot-display">
-        <span data-i18n="prize">奖池</span>: <strong>0</strong>
-        <span data-i18n="coins">金币</span>
       </div>
     </div>
 
@@ -169,6 +171,35 @@
     <div id="champ-rounds" class="champ-rounds"></div>
     <div id="champ-mons"  class="champ-mons"></div>
     <button id="champ-back-btn" class="btn btn-gold btn-lg champ-back">🏠 返回大厅</button>
+  </div>
+</div>
+<!-- ── HELP OVERLAY ─────────────────────────────────────────────────────────── -->
+<div id="help-overlay" class="overlay hidden help-overlay">
+  <div class="help-box">
+    <button class="help-close" id="help-close">✕</button>
+    <h2 class="help-title">📖 游戏手册</h2>
+
+    <section class="help-section">
+      <h3 class="help-section-title">🃏 牌型大小（从强到弱）</h3>
+      <div id="help-hands" class="help-hands"></div>
+    </section>
+
+    <section class="help-section">
+      <h3 class="help-section-title">🔥 火系神奇宝贝</h3>
+      <div id="help-mons-fire" class="help-mons-grid"></div>
+    </section>
+    <section class="help-section">
+      <h3 class="help-section-title">💧 水系神奇宝贝</h3>
+      <div id="help-mons-water" class="help-mons-grid"></div>
+    </section>
+    <section class="help-section">
+      <h3 class="help-section-title">🌿 草系神奇宝贝</h3>
+      <div id="help-mons-grass" class="help-mons-grid"></div>
+    </section>
+    <section class="help-section">
+      <h3 class="help-section-title">⚡ 电系神奇宝贝</h3>
+      <div id="help-mons-electric" class="help-mons-grid"></div>
+    </section>
   </div>
 </div>
 <!-- ── ERROR TOAST ──────────────────────────────────────────────────────────── -->

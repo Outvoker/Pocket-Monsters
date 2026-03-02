@@ -39,7 +39,7 @@ class RoomState {
     this.needsToAct    = new Set();
     this.smallBlind    = 10;
     this.bigBlind      = 20;
-    this.maxPlayers    = 6;
+    this.maxPlayers    = 8;
     this.minPlayers    = 2;
     this.winners       = [];
     this.roundCount    = 0;       // total rounds played

@@ -157,7 +157,7 @@
 
   const TYPE_EMOJI  = { fire: '🔥', water: '💧', grass: '🌿', electric: '⚡' };
   const VALUE_LABEL = v =>
-    v === 1 ? 'A' : v === 13 ? 'K' : v === 12 ? 'Q' : v === 11 ? 'J' : String(v);
+    v === 13 ? 'A' : v === 12 ? 'K' : v === 11 ? 'Q' : v === 10 ? 'J' : String(v + 1);
 
   // ─── DOM helpers ────────────────────────────────────────────────────────────
   const $  = id => document.getElementById(id);
@@ -228,6 +228,11 @@
   // ─── Main render ─────────────────────────────────────────────────────────────
   function renderGame(state) {
     if (!state) return;
+
+    // ─── BGM switch: lobby vs battle ─────────────────────────────────────────
+    if (typeof window.switchBgm === 'function') {
+      window.switchBgm(state.phase === 'waiting' ? window.BGM_LOBBY : window.BGM_BATTLE);
+    }
 
     const phaseKey   = state.phase;
     const phaseLabel = (t('phaseLabels') || {})[phaseKey] || phaseKey;
@@ -664,8 +669,12 @@
     const volPanel  = $('vol-panel');
     if (!bgm) return;
 
-    // Pokémon Showdown hosts freely available battle tracks
-    const BGM_URL = 'https://play.pokemonshowdown.com/audio/hgss-johto-trainer.mp3'; // Omega Ruby/Alpha Sapphire rival — confirmed working
+    // ↓↓ 两个场景的 BGM ↓↓
+    const BGM_LOBBY  = '/audio/op.mp3';                                                // 大厅/等待 BGM
+    const BGM_BATTLE = 'https://play.pokemonshowdown.com/audio/hgss-johto-trainer.mp3'; // 游戏中对战 BGM
+
+    let currentBgmUrl = null;
+    let userInteracted = false;
     bgm.volume = 0.35;
 
     // Update slider display to match initial volume
@@ -691,13 +700,98 @@
       });
     }
 
+    // Switch BGM track (crossfade-ish: fade out → swap → fade in)
+    window.switchBgm = function(url) {
+      if (currentBgmUrl === url) return;
+      currentBgmUrl = url;
+      if (!userInteracted) return; // will be played on next interaction
+      const targetVol = bgm.volume;
+      // Fade out
+      let fadeOut = setInterval(() => {
+        if (bgm.volume > 0.04) {
+          bgm.volume = Math.max(0, bgm.volume - 0.04);
+        } else {
+          clearInterval(fadeOut);
+          bgm.pause();
+          bgm.src = url;
+          bgm.volume = 0;
+          bgm.play().catch(() => {});
+          // Fade in
+          let fadeIn = setInterval(() => {
+            if (bgm.volume < targetVol - 0.04) {
+              bgm.volume = Math.min(targetVol, bgm.volume + 0.04);
+            } else {
+              bgm.volume = targetVol;
+              clearInterval(fadeIn);
+            }
+          }, 40);
+        }
+      }, 40);
+    };
+
     // Auto-start BGM on first user interaction (browsers block autoplay)
     function tryPlayBgm() {
-      if (!bgm.src || !bgm.src.startsWith('http')) bgm.src = BGM_URL;
+      userInteracted = true;
+      const url = currentBgmUrl || BGM_LOBBY;
+      currentBgmUrl = url;
+      bgm.src = url;
       bgm.play().catch(() => {});
     }
     document.addEventListener('click', tryPlayBgm, { once: true });
     document.addEventListener('touchstart', tryPlayBgm, { once: true });
+
+    // Default to lobby BGM on load
+    window.switchBgm(BGM_LOBBY);
+
+    // Expose URLs for renderGame to use
+    window.BGM_LOBBY  = BGM_LOBBY;
+    window.BGM_BATTLE = BGM_BATTLE;
+  })();
+
+  // ─── Help overlay ──────────────────────────────────────────────────────────────
+  (function initHelp() {
+    const overlay  = document.getElementById('help-overlay');
+    const btnHelp  = document.getElementById('btn-help');
+    const btnClose = document.getElementById('help-close');
+    if (!overlay || !btnHelp) return;
+
+    const RANK_LABELS = { 9:'#1', 8:'#2', 7:'#3', 6:'#4', 5:'#5', 4:'#6', 3:'#7', 2:'#8', 1:'#9', 0:'#10' };
+
+    function buildHelp() {
+      // ── Hand rankings ──
+      const handsEl = document.getElementById('help-hands');
+      if (handsEl && !handsEl.childElementCount) {
+        const sorted = [...GL.HAND_RANKS].sort((a, b) => b.rank - a.rank);
+        handsEl.innerHTML = sorted.map(r => `
+          <div class="help-hand-row">
+            <span class="help-hand-rank">${RANK_LABELS[r.rank]}</span>
+            <span class="help-hand-label">${r.label}</span>
+            <span class="help-hand-desc">${r.desc}</span>
+            <span class="help-hand-power">+${r.power}</span>
+          </div>`).join('');
+      }
+
+      // ── Pokémon per type ──
+      const typeIds = { fire:'help-mons-fire', water:'help-mons-water', grass:'help-mons-grass', electric:'help-mons-electric' };
+      for (const [type, elId] of Object.entries(typeIds)) {
+        const el = document.getElementById(elId);
+        if (!el || el.childElementCount) continue;
+        const mons = [...GL.POKEMON_DATA[type]].sort((a, b) => b.value - a.value); // A(13) first
+        el.innerHTML = mons.map(m => `
+          <div class="help-mon-card">
+            <div class="help-mon-val">${VALUE_LABEL(m.value)}</div>
+            <img class="help-mon-img" src="${GL.spriteUrl(m.id)}" alt="${m.zhName}" loading="lazy" />
+            <div class="help-mon-name">${m.zhName}</div>
+          </div>`).join('');
+      }
+    }
+
+    btnHelp.addEventListener('click', () => {
+      buildHelp();
+      overlay.classList.remove('hidden');
+    });
+    btnClose.addEventListener('click', () => overlay.classList.add('hidden'));
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
   })();
 
   // ─── Boot ─────────────────────────────────────────────────────────────────────
