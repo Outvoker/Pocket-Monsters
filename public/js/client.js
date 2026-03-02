@@ -548,15 +548,16 @@
         const isWinner = winnerIds.has(r.id);
         const deltaStr = (r.delta >= 0 ? '+' : '') + r.delta;
         const deltaClass = r.delta > 0 ? 'delta-pos' : r.delta < 0 ? 'delta-neg' : 'delta-zero';
-        const rankStr = r.bestHand ? ` · ${escHtml(r.bestHand.rankLabel)}` : r.folded ? ` · (${t('folded')})` : '';
         const powerStr = r.bestHand && r.bestHand.totalPower != null
           ? Math.round(r.bestHand.totalPower * 100).toLocaleString()
           : '-';
+        const rankStr = r.bestHand
+          ? ` · ${escHtml(r.bestHand.rankLabel)} ⚡${powerStr}`
+          : r.folded ? ` · (${t('folded')})` : '';
         html += `<div class="round-result-row${isWinner ? ' is-winner' : ''}">
           <span class="rr-name">${r.isBot ? '🤖 ' : ''}${escHtml(r.name)}${isWinner ? ' 🏆' : ''}${rankStr}</span>
-          <span class="rr-chips">${r.chips} ${t('coins')}</span>
-          <span class="rr-power">⚡${powerStr}</span>
           <span class="rr-delta ${deltaClass}">${deltaStr}</span>
+          <span class="rr-chips">= ${r.chips} ${t('coins')}</span>
         </div>`;
       });
       html += '</div></div>';

@@ -1131,6 +1131,7 @@ input[type="range"] {
   border-radius: 10px;
   padding: 10px 12px;
   min-width: 260px;
+  text-align: left;
 }
 .round-results-title {
   font-size: 11px;
@@ -1142,7 +1143,7 @@ input[type="range"] {
 .round-results-list { display: flex; flex-direction: column; gap: 4px; }
 .round-result-row {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto auto;
   gap: 8px;
   align-items: center;
   font-size: 12px;
@@ -1542,3 +1543,100 @@ input[type="range"] {
 .phase-waiting  { background: rgba(84,110,122,.2);  color: #90a4ae; }
 
 /* (deal-card animation removed — using mon-appear on .poke-mon.appearing) */
+
+/* ─── Mobile responsive: showdown settlement overlay ─────────────────────── */
+@media (max-width: 520px) {
+  /* Make overlay scrollable so tall content is reachable */
+  .overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px 0 20px;
+  }
+
+  /* Tighter box padding & full-width */
+  .overlay-box {
+    width: 96%;
+    padding: 18px 14px 16px;
+    border-radius: 14px;
+    margin: auto;
+  }
+  .overlay-box.showdown-epic-box {
+    padding: 16px 12px 14px;
+  }
+
+  /* Shrink title */
+  #showdown-title,
+  .showdown-victory-title {
+    font-size: 11px;
+    margin-bottom: 10px;
+  }
+
+  /* Winner banner */
+  .showdown-winner-name {
+    font-size: 17px;
+    margin-bottom: 2px;
+  }
+  .showdown-rank-name { font-size: 15px; }
+  .showdown-rank-label { font-size: 11px; }
+
+  /* Power display — big number shrinks */
+  .showdown-power {
+    font-size: 22px;
+    margin: 2px 0 10px;
+  }
+
+  /* Winner card area → tighter padding */
+  .showdown-winner {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+
+  /* Pokémon cards: no wrapping, auto-shrink to fill one row */
+  .showdown-mons-epic {
+    flex-wrap: nowrap;
+    gap: 4px;
+    margin: 4px 0 10px;
+  }
+  .showdown-mon-big {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .showdown-mon-big img {
+    width: 100%;
+    height: auto;
+    max-width: 72px;
+  }
+  .showdown-mon-big-name {
+    font-size: 8px;
+    max-width: 100%;
+  }
+  .showdown-mon-big-val {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+  .showdown-mon-big-badge { font-size: 9px; }
+  .showdown-mon-big-type  { font-size: 8px; }
+
+  /* Group labels */
+  .showdown-group-label { font-size: 10px; }
+
+  /* Round results table: single row, smaller fonts */
+  .round-results {
+    padding: 8px 8px;
+    min-width: unset;
+  }
+  .round-result-row {
+    grid-template-columns: 1fr auto auto;
+    font-size: 10px;
+    padding: 5px 6px;
+    gap: 5px;
+  }
+  .rr-name  { font-size: 10px; }
+  .rr-chips { font-size: 9px; }
+  .rr-power { font-size: 9px; }
+  .rr-delta { font-size: 11px; }
+
+  /* Countdown */
+  .countdown-text { font-size: 11px; margin-top: 10px; }
+}
