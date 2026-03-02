@@ -59,6 +59,7 @@ class RoomState {
       smallBlind: this.smallBlind, bigBlind: this.bigBlind, winners: this.winners,
       roundCount: this.roundCount, blindLevel: this.blindLevel,
       finalChampion: this.finalChampion,
+      roundResults: this.roundResults || null,
       players: this.players.map(p => ({
         id: p.id, name: p.name, chips: p.chips, folded: p.folded, allIn: p.allIn,
         bet: p.bet, totalBet: p.totalBet, connected: p.connected, spectator: !!p.spectator,
@@ -144,10 +145,16 @@ function botDecide(room, bot) {
 
 function executeBotAction(room, bot) {
   if (room.phase === GL.PHASES.WAITING || room.phase === GL.PHASES.SHOWDOWN) return;
-  if (bot.folded || bot.allIn || bot.spectator) return;
+  // Bot can't act (all-in / folded / spectator) — ensure needsToAct is cleaned and advance
+  if (bot.folded || bot.allIn || bot.spectator) {
+    room.needsToAct.delete(bot.id);
+    checkAndAdvance(room);
+    return;
+  }
 
   const { action, amount } = botDecide(room, bot);
   const toCall = Math.max(0, room.currentBet - bot.bet);
+  let logAmount = 0;
 
   switch (action) {
     case GL.ACTIONS.FOLD:
@@ -158,7 +165,8 @@ function executeBotAction(room, bot) {
       room.needsToAct.delete(bot.id);
       break;
     case GL.ACTIONS.CALL:
-      addBet(room, bot, Math.min(toCall, bot.chips));
+      logAmount = Math.min(toCall, bot.chips);
+      addBet(room, bot, logAmount);
       room.needsToAct.delete(bot.id);
       break;
     case GL.ACTIONS.RAISE: {
@@ -166,6 +174,7 @@ function executeBotAction(room, bot) {
         const diff = amount - bot.bet;
         addBet(room, bot, Math.min(diff, bot.chips));
         room.currentBet = bot.bet;
+        logAmount = bot.bet;
         room.needsToAct = new Set(room.activePlayers().filter(p => p.id !== bot.id).map(p => p.id));
       } else {
         room.needsToAct.delete(bot.id);
@@ -174,6 +183,7 @@ function executeBotAction(room, bot) {
     }
     case GL.ACTIONS.ALLIN: {
       const all = bot.chips;
+      logAmount = all;
       const newTotal = bot.bet + all;
       addBet(room, bot, all);
       if (newTotal > room.currentBet) {
@@ -185,6 +195,7 @@ function executeBotAction(room, bot) {
       break;
     }
   }
+  broadcastActionLog(room, bot, action, logAmount);
   checkAndAdvance(room);
 }
 
@@ -192,7 +203,13 @@ function scheduleBotAction(room) {
   const current = room.players[room.turnIndex];
   if (!current || !current.isBot) return;
   if (room.phase === GL.PHASES.WAITING || room.phase === GL.PHASES.SHOWDOWN) return;
-  if (current.folded || current.allIn || current.spectator) return;
+  if (room._autoRevealing) return;  // don't interfere during board auto-reveal
+  // Bot can't act — clean up and advance immediately instead of freezing
+  if (current.folded || current.allIn || current.spectator) {
+    room.needsToAct.delete(current.id);
+    setImmediate(() => checkAndAdvance(room));
+    return;
+  }
 
   const delay = 900 + Math.random() * 1400;   // 0.9-2.3 s think time
   const roomId = room.id;
@@ -237,6 +254,8 @@ function startGame(room) {
   room.deck = GL.shuffle(GL.buildDeck());
   room.community = []; room.pot = 0; room.winners = []; room.finalChampion = null;
   room.phase = GL.PHASES.PREFLOP;
+  room._endGameCalled = false;
+  room._autoRevealing = false;
 
   // Mark players with no chips as spectators for this round
   for (const p of room.players) {
@@ -310,16 +329,21 @@ function autoRevealBoard(room) {
   if (room.community.length < 4) steps.push({ phase: GL.PHASES.TURN,  limit: 4 });
   if (room.community.length < 5) steps.push({ phase: GL.PHASES.RIVER, limit: 5 });
 
+  room._autoRevealing = true;   // suppress bot scheduling while we reveal
   let delay = 800;
   for (const step of steps) {
     setTimeout(() => {
+      if (room._endGameCalled) return;
       room.phase = step.phase;
       while (room.community.length < step.limit) room.community.push(dealCard(room));
       emitGameState(room);
     }, delay);
     delay += 1600;
   }
-  setTimeout(() => doShowdown(room), delay);
+  setTimeout(() => {
+    room._autoRevealing = false;
+    doShowdown(room);
+  }, delay);
 }
 
 function proceedToNextPhase(room) {
@@ -351,6 +375,7 @@ function proceedToNextPhase(room) {
 }
 
 function doShowdown(room) {
+  if (room.phase === GL.PHASES.SHOWDOWN) return;  // guard against duplicate calls
   room.phase = GL.PHASES.SHOWDOWN;
   const nf = room.nonFoldedPlayers();
   for (const p of nf) p.bestHand = GL.evaluateBestHand([...p.hand, ...room.community]);
@@ -361,9 +386,30 @@ function doShowdown(room) {
 }
 
 function endGame(room, winners) {
+  if (room._endGameCalled) return;  // prevent double settlement
+  room._endGameCalled = true;
+
+  // Snapshot start-of-round chips (current chips + what they bet this round)
+  const startChips = {};
+  for (const p of room.players) startChips[p.id] = p.chips + (p.totalBet || 0);
+
   const share = winners.length ? Math.floor(room.pot / winners.length) : 0;
   for (const w of winners) w.chips += share;
   if (winners.length) winners[0].chips += room.pot - share * winners.length;
+
+  // Per-player chip delta for the result panel
+  room.roundResults = room.players
+    .filter(p => !p.spectator)
+    .map(p => ({
+      id:     p.id,
+      name:   p.name,
+      isBot:  !!p.isBot,
+      delta:  p.chips - startChips[p.id],
+      chips:  p.chips,
+      folded: p.folded,
+      bestHand: p.bestHand ? { rankLabel: p.bestHand.rankLabel, totalPower: p.bestHand.totalPower } : null,
+    }));
+
   room.winners = winners.map(w => ({ id:w.id, name:w.name, chips:w.chips, hand:w.hand, bestHand:w.bestHand }));
   room.phase = GL.PHASES.SHOWDOWN;
 
@@ -384,6 +430,9 @@ function endGame(room, winners) {
     }
     const alive = room.players.filter(p => p.chips > 0);
 
+    // If no humans remain at all, just close the room silently
+    if (closeRoomIfBotsOnly(room)) return;
+
     if (alive.length <= 1) {
       // Final champion!
       const champion = alive[0] || winners[0];
@@ -402,6 +451,33 @@ function endGame(room, winners) {
       startGame(room);
     }
   }, 9000);
+}
+
+// Close a room if no human (non-bot) players remain
+function closeRoomIfBotsOnly(room) {
+  const hasHuman = room.players.some(p => !p.isBot);
+  if (hasHuman) return false;
+  console.log(`Room ${room.id}: no humans left, closing.`);
+  delete rooms[room.id];
+  broadcastRoomList();
+  return true;
+}
+
+function broadcastActionLog(room, player, action, amount) {
+  const labels = {
+    fold:  { zh: '撤退',     en: 'Folded'   },
+    check: { zh: '蓄力',     en: 'Checked'  },
+    call:  { zh: '跟注',     en: 'Called'   },
+    raise: { zh: '加注',     en: 'Raised'   },
+    allin: { zh: '全力出击', en: 'All-In'   },
+  };
+  io.to(room.id).emit('action_log', {
+    name:   player.name,
+    isBot:  !!player.isBot,
+    action,
+    amount: amount || 0,
+    labels,
+  });
 }
 
 io.on('connection', socket => {
@@ -473,6 +549,7 @@ io.on('connection', socket => {
     if (player.folded || player.spectator) return;
 
     const toCall = Math.max(0, room.currentBet - player.bet);
+    let logAmount = 0;
 
     switch (action) {
       case GL.ACTIONS.FOLD:
@@ -484,21 +561,25 @@ io.on('connection', socket => {
         room.needsToAct.delete(player.id);
         break;
       case GL.ACTIONS.CALL: {
-        addBet(room, player, Math.min(toCall, player.chips));
+        logAmount = Math.min(toCall, player.chips);
+        addBet(room, player, logAmount);
         room.needsToAct.delete(player.id);
         break;
       }
       case GL.ACTIONS.RAISE: {
         if (!amount || amount <= room.currentBet) return socket.emit('error', { msg: '加注必须大于当前注额' });
         const diff = amount - player.bet;
-        addBet(room, player, Math.min(diff, player.chips));
-        room.currentBet = player.bet; // what player now has in total
+        logAmount = Math.min(diff, player.chips);
+        addBet(room, player, logAmount);
+        room.currentBet = player.bet;
+        logAmount = player.bet;  // show total bet
         room.needsToAct = new Set(room.activePlayers().filter(p => p.id !== player.id).map(p => p.id));
         break;
       }
       case GL.ACTIONS.ALLIN: {
         const all = player.chips;
         const newTotal = player.bet + all;
+        logAmount = all;
         addBet(room, player, all);
         if (newTotal > room.currentBet) {
           room.currentBet = newTotal;
@@ -510,6 +591,7 @@ io.on('connection', socket => {
       }
       default: return socket.emit('error', { msg: '未知操作' });
     }
+    broadcastActionLog(room, player, action, logAmount);
     checkAndAdvance(room);
   });
 
@@ -520,15 +602,32 @@ io.on('connection', socket => {
       if (idx === -1) continue;
       if (room.phase === GL.PHASES.WAITING) {
         room.players.splice(idx, 1);
-        if (room.players.length === 0) delete rooms[roomId];
-        else if (room.hostId === socket.id) { room.hostId = room.players[0].id; room.hostName = room.players[0].name; }
-        if (rooms[roomId]) emitGameState(room);
+        if (room.players.length === 0 || closeRoomIfBotsOnly(room)) {
+          // room already deleted by closeRoomIfBotsOnly or was empty
+          if (rooms[roomId]) delete rooms[roomId];
+          broadcastRoomList();
+          continue;
+        }
+        if (room.hostId === socket.id) { room.hostId = room.players.find(p => !p.isBot)?.id || room.players[0].id; room.hostName = room.players.find(p => !p.isBot)?.name || room.players[0].name; }
+        emitGameState(room);
       } else {
         room.players[idx].connected = false;
         room.players[idx].folded = true;
         room.needsToAct.delete(socket.id);
-        if (room.players[room.turnIndex]?.id === socket.id) checkAndAdvance(room);
-        else emitGameState(room);
+        // Check if only bots remain after this disconnect; close after a short delay
+        // so the current pending action can resolve cleanly
+        const stillHuman = room.players.some(p => !p.isBot && p.id !== socket.id);
+        if (!stillHuman) {
+          setTimeout(() => {
+            if (rooms[roomId]) {
+              delete rooms[roomId];
+              broadcastRoomList();
+            }
+          }, 3000);
+        } else {
+          if (room.players[room.turnIndex]?.id === socket.id) checkAndAdvance(room);
+          else emitGameState(room);
+        }
       }
       broadcastRoomList();
     }

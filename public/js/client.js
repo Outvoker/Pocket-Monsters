@@ -171,11 +171,43 @@
     socket.on('room_joined', ({ roomId, playerId }) => {
       myId = playerId; myRoomId = roomId; showGameScreen();
     });
-    socket.on('game_state',  state => { gameState = state; renderGame(state); });
-    socket.on('error',       ({ msg }) => showToast(msg, 'error'));
-    socket.on('disconnect',  () => showToast('连接断开', 'error'));
+    socket.on('game_state',   state => { gameState = state; renderGame(state); });
+    socket.on('action_log',   data  => showActionLog(data));
+    socket.on('error',        ({ msg }) => showToast(msg, 'error'));
+    socket.on('disconnect',   () => showToast('连接断开', 'error'));
   }
+  // ─── Action log feed ───────────────────────────────────────────────────────────────
+  const ACTION_ICON  = { fold: '🏳️', check: '💪', call: '⚔️', raise: '⬆️', allin: '💥' };
+  const ACTION_COLOR = { fold: '#ef5350', check: '#78909c', call: '#29b6f6', raise: '#ffca28', allin: '#ff6e40' };
 
+  const actionFeed = $('action-log-feed');
+  function showActionLog({ name, isBot, action, amount, labels }) {
+    if (!actionFeed) return;
+    const zhLabel = (labels[action] || {}).zh || action;
+    const enLabel = (labels[action] || {}).en || action;
+    const label   = lang === 'zh' ? zhLabel : enLabel;
+    const icon    = ACTION_ICON[action]  || '•';
+    const color   = ACTION_COLOR[action] || '#ccc';
+    const amountStr = amount > 0 ? ` <span class="al-amount">${amount}</span>` : '';
+
+    const el = document.createElement('div');
+    el.className = 'action-log-item';
+    el.style.borderLeftColor = color;
+    el.innerHTML = `<span class="al-icon">${icon}</span>
+      <span class="al-name">${isBot ? '🤖 ' : ''}${escHtml(name)}</span>
+      <span class="al-label" style="color:${color}">${label}</span>${amountStr}`;
+    actionFeed.prepend(el);
+
+    // Limit feed to 6 entries
+    while (actionFeed.children.length > 6) actionFeed.lastChild.remove();
+
+    // Auto-remove after 4 s
+    requestAnimationFrame(() => el.classList.add('al-visible'));
+    setTimeout(() => {
+      el.classList.add('al-hiding');
+      el.addEventListener('transitionend', () => el.remove(), { once: true });
+    }, 4000);
+  }
   // ─── Toast ──────────────────────────────────────────────────────────────────
   const toastEl = $('toast');
   function showToast(msg, type = '') {
@@ -505,7 +537,30 @@
     }
 
     const others = state.players.filter(p => !winners.find(ww => ww.id === p.id) && p.hand);
-    if (others.length) {
+
+    // ── Per-player chip change table ──
+    if (state.roundResults && state.roundResults.length) {
+      const winnerIds = new Set(winners.map(w => w.id));
+      html += '<div class="round-results">';
+      html += `<div class="round-results-title">${lang === 'zh' ? '本局金币变化' : 'Chip Changes'}</div>`;
+      html += '<div class="round-results-list">';
+      state.roundResults.forEach(r => {
+        const isWinner = winnerIds.has(r.id);
+        const deltaStr = (r.delta >= 0 ? '+' : '') + r.delta;
+        const deltaClass = r.delta > 0 ? 'delta-pos' : r.delta < 0 ? 'delta-neg' : 'delta-zero';
+        const rankStr = r.bestHand ? ` · ${escHtml(r.bestHand.rankLabel)}` : r.folded ? ` · (${t('folded')})` : '';
+        const powerStr = r.bestHand && r.bestHand.totalPower != null
+          ? Math.round(r.bestHand.totalPower * 100).toLocaleString()
+          : '-';
+        html += `<div class="round-result-row${isWinner ? ' is-winner' : ''}">
+          <span class="rr-name">${r.isBot ? '🤖 ' : ''}${escHtml(r.name)}${isWinner ? ' 🏆' : ''}${rankStr}</span>
+          <span class="rr-chips">${r.chips} ${t('coins')}</span>
+          <span class="rr-power">⚡${powerStr}</span>
+          <span class="rr-delta ${deltaClass}">${deltaStr}</span>
+        </div>`;
+      });
+      html += '</div></div>';
+    } else if (others.length) {
       html += '<div class="other-results">';
       others.forEach(p => {
         const bh = p.bestHand;

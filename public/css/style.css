@@ -1124,12 +1124,89 @@ input[type="range"] {
   border-radius: 6px;
 }
 
+/* ─── Round results chip-change table ─────────────────────────────────────── */
+.round-results {
+  margin: 10px 0 16px;
+  background: rgba(0,0,0,.3);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 260px;
+}
+.round-results-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+.round-results-list { display: flex; flex-direction: column; gap: 4px; }
+.round-result-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.04);
+  color: #ccc;
+}
+.round-result-row.is-winner {
+  background: rgba(255,215,0,.12);
+  color: #fff;
+}
+.rr-name  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rr-chips { color: #aaa; font-size: 11px; white-space: nowrap; }
+.rr-power { color: #b0bec5; font-size: 11px; white-space: nowrap; letter-spacing: .02em; }
+.rr-delta { font-weight: 700; font-size: 13px; white-space: nowrap; }
+.delta-pos  { color: #66bb6a; }
+.delta-neg  { color: #ef5350; }
+.delta-zero { color: #888; }
+
 .countdown-text {
   font-size: 12px;
   color: #666;
   margin-top: 16px;
 }
 #countdown { color: var(--gold); font-weight: 700; }
+
+/* ─── Action log feed ─────────────────────────────────────────────────────── */
+.action-log-feed {
+  position: fixed;
+  left: 12px;
+  bottom: 80px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 5px;
+  z-index: 120;
+  pointer-events: none;
+  max-width: 220px;
+}
+.action-log-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(10,10,20,.78);
+  border: 1px solid rgba(255,255,255,.1);
+  border-left: 3px solid #888;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #ddd;
+  opacity: 0;
+  transform: translateX(-14px);
+  transition: opacity .22s ease, transform .22s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  backdrop-filter: blur(4px);
+}
+.action-log-item.al-visible  { opacity: 1; transform: translateX(0); }
+.action-log-item.al-hiding   { opacity: 0; transform: translateX(-14px); }
+.al-icon   { font-size: 13px; flex-shrink: 0; }
+.al-name   { font-weight: 600; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+.al-label  { flex-shrink: 0; }
+.al-amount { color: var(--gold); font-weight: 700; margin-left: 2px; }
 
 /* ─── Toast ───────────────────────────────────────────────────────────────── */
 .toast {
