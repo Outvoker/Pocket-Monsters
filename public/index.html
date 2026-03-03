@@ -168,6 +168,42 @@
   <source src="/audio/pikachu.ogg" type="audio/ogg" />
 </audio>
 
+<!-- ── FIGHT SOUND EFFECT ────────────────────────────────────────────────────── -->
+<audio id="fight-sfx" preload="auto">
+  <source src="/audio/fight.wav" type="audio/wav" />
+</audio>
+
+<!-- ── BATTLE START BANNER ───────────────────────────────────────────────────── -->
+<div id="battle-start-banner" class="battle-start-banner hidden">
+  <div class="battle-banner-content">
+    <div class="battle-banner-text">決闘開始</div>
+    <div class="battle-banner-subtext">BATTLE START</div>
+  </div>
+</div>
+
+<!-- ── TOURNAMENT BATTLE OVERLAY ─────────────────────────────────────────────── -->
+<div id="tournament-overlay" class="overlay hidden tournament-overlay">
+  <div class="tournament-box">
+    <div class="tournament-title" id="tournament-title">⚔️ 擂台对决</div>
+    <div class="tournament-vs">VS</div>
+    <div class="tournament-players">
+      <div class="tournament-player tournament-player-left" id="tournament-p1">
+        <div class="tournament-player-name"></div>
+        <div class="tournament-player-mons"></div>
+        <div class="tournament-player-rank"></div>
+        <div class="tournament-player-power"></div>
+      </div>
+      <div class="tournament-player tournament-player-right" id="tournament-p2">
+        <div class="tournament-player-name"></div>
+        <div class="tournament-player-mons"></div>
+        <div class="tournament-player-rank"></div>
+        <div class="tournament-player-power"></div>
+      </div>
+    </div>
+    <div class="tournament-result" id="tournament-result"></div>
+  </div>
+</div>
+
 <!-- ── SHOWDOWN OVERLAY ──────────────────────────────────────────────────────── -->
 <div id="showdown-overlay" class="overlay hidden">
   <div class="overlay-box">

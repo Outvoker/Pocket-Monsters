@@ -60,6 +60,7 @@ class RoomState {
       roundCount: this.roundCount, blindLevel: this.blindLevel,
       finalChampion: this.finalChampion,
       roundResults: this.roundResults || null,
+      tournamentBracket: this.tournamentBracket || null,
       players: this.players.map(p => ({
         id: p.id, name: p.name, chips: p.chips, folded: p.folded, allIn: p.allIn,
         bet: p.bet, totalBet: p.totalBet, connected: p.connected, spectator: !!p.spectator,
@@ -463,7 +464,54 @@ function doShowdown(room) {
   nf.sort((a,b) => GL.compareHandResult(b.bestHand, a.bestHand));
   const topPower = nf[0].bestHand.totalPower;
   const winners  = nf.filter(p => p.bestHand.totalPower === topPower);
+  
+  // Generate tournament bracket for animation
+  room.tournamentBracket = generateTournamentBracket(nf);
+  
   endGame(room, winners);
+}
+
+// Generate tournament bracket: sequential battles between non-folded players
+// Only generate bracket if there are 2+ players (skip if everyone else folded)
+function generateTournamentBracket(players) {
+  if (players.length < 2) return [];
+  
+  const bracket = [];
+  let remaining = [...players];
+  
+  // Create sequential battles: A vs B, winner vs C, winner vs D, etc.
+  while (remaining.length > 1) {
+    const p1 = remaining[0];
+    const p2 = remaining[1];
+    
+    // Determine winner based on hand strength
+    const comparison = GL.compareHandResult(p1.bestHand, p2.bestHand);
+    const winner = comparison >= 0 ? p1 : p2;
+    const loser = comparison >= 0 ? p2 : p1;
+    
+    bracket.push({
+      player1: {
+        id: p1.id,
+        name: p1.name,
+        isBot: p1.isBot,
+        hand: p1.hand,
+        bestHand: p1.bestHand,
+      },
+      player2: {
+        id: p2.id,
+        name: p2.name,
+        isBot: p2.isBot,
+        hand: p2.hand,
+        bestHand: p2.bestHand,
+      },
+      winnerId: winner.id,
+    });
+    
+    // Remove loser, keep winner at front for next battle
+    remaining = [winner, ...remaining.slice(2)];
+  }
+  
+  return bracket;
 }
 
 function endGame(room, winners) {
@@ -504,6 +552,16 @@ function endGame(room, winners) {
 
   emitGameState(room);
 
+  // Calculate delay: shorter if everyone folded, longer for actual showdowns
+  const BATTLE_DURATION = 8000;  // 8 seconds per battle (slower with 3s pause)
+  const PAUSE_BETWEEN = 1000;    // 1 second pause between battles
+  const bracketLength = room.tournamentBracket ? room.tournamentBracket.length : 0;
+  const tournamentTime = bracketLength * (BATTLE_DURATION + PAUSE_BETWEEN);
+  
+  // If no tournament (everyone folded), use 5s delay; otherwise 15s base + animation time
+  const baseDelay = bracketLength === 0 ? 5000 : 15000;
+  const totalDelay = baseDelay + tournamentTime;
+
   setTimeout(() => {
     // Move broke players to spectator
     for (const p of room.players) {
@@ -531,7 +589,7 @@ function endGame(room, winners) {
         room.dealerIdx = (room.dealerIdx + 1) % room.players.length;
       startGame(room);
     }
-  }, 15000);
+  }, totalDelay);
 }
 
 // Close a room if no human (non-bot) players remain

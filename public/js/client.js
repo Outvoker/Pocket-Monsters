@@ -160,6 +160,10 @@
   const renderedCommunityKeys = new Set();
   // tracks which hand card keys are already in the DOM (never re-animate them)
   const renderedMyHandKeys = new Set();
+  // tournament animation state
+  let tournamentAnimationActive = false;
+  let tournamentAnimationComplete = false;
+  let lastShowdownRound = -1; // Track which round's showdown we've animated
 
   const TYPE_EMOJI  = { fire: '🔥', water: '💧', grass: '🌿', electric: '⚡' };
   const VALUE_LABEL = v =>
@@ -305,10 +309,25 @@
     if (state.finalChampion) {
       showFinalChampion(state);
     } else if (state.phase === 'showdown' && state.winners && state.winners.length) {
-      showShowdown(state);
+      // Reset animation state for each new round
+      if (state.roundCount !== lastShowdownRound) {
+        lastShowdownRound = state.roundCount;
+        tournamentAnimationComplete = false;
+        tournamentAnimationActive = false;
+      }
+      
+      // Check if we need to play tournament animations first
+      if (state.tournamentBracket && state.tournamentBracket.length > 0 && !tournamentAnimationComplete) {
+        if (!tournamentAnimationActive) {
+          playTournamentAnimations(state);
+        }
+      } else {
+        showShowdown(state);
+      }
     } else {
       hideShowdown();
       hideFinalChampion();
+      hideTournament();
     }
   }
 
@@ -558,6 +577,202 @@
     });
   }
 
+  // ─── Tournament Animations ───────────────────────────────────────────────────
+  const tournamentOverlay = $('tournament-overlay');
+  
+  function playTournamentAnimations(state) {
+    tournamentAnimationActive = true;
+    const bracket = state.tournamentBracket || [];
+    
+    if (bracket.length === 0) {
+      tournamentAnimationComplete = true;
+      tournamentAnimationActive = false;
+      showShowdown(state);
+      return;
+    }
+    
+    // Show battle start banner first
+    showBattleStartBanner();
+    
+    let currentBattleIndex = 0;
+    const BATTLE_DURATION = 8000; // 8 seconds per battle (slower)
+    const PAUSE_BETWEEN = 1000;   // 1 second pause between battles
+    const BANNER_DURATION = 2000; // 2 seconds for banner
+    
+    function playNextBattle() {
+      if (currentBattleIndex >= bracket.length) {
+        // All battles complete, hide tournament overlay and show showdown
+        hideTournament();
+        tournamentAnimationComplete = true;
+        tournamentAnimationActive = false;
+        showShowdown(state);
+        return;
+      }
+      
+      const battle = bracket[currentBattleIndex];
+      showTournamentBattle(battle, state.community);
+      
+      currentBattleIndex++;
+      setTimeout(playNextBattle, BATTLE_DURATION + PAUSE_BETWEEN);
+    }
+    
+    // Start first battle after banner completes
+    setTimeout(() => {
+      playNextBattle();
+    }, BANNER_DURATION);
+  }
+  
+  function showBattleStartBanner() {
+    const banner = $('battle-start-banner');
+    if (!banner) return;
+    
+    banner.classList.remove('hidden');
+    
+    // Play fight sound effect
+    const fightSfx = $('fight-sfx');
+    if (fightSfx) {
+      fightSfx.currentTime = 0;
+      fightSfx.volume = 0.7;
+      fightSfx.play().catch(e => console.log('Fight SFX play failed:', e));
+    }
+    
+    // Hide banner after 2 seconds
+    setTimeout(() => {
+      banner.classList.add('hidden');
+    }, 2000);
+  }
+  
+  function showTournamentBattle(battle, community) {
+    if (!tournamentOverlay) return;
+    
+    tournamentOverlay.classList.remove('hidden');
+    
+    const p1El = $('tournament-p1');
+    const p2El = $('tournament-p2');
+    const resultEl = $('tournament-result');
+    const titleEl = $('tournament-title');
+    
+    // Set title
+    titleEl.textContent = lang === 'zh' ? '⚔️ 擂台对决' : '⚔️ Arena Battle';
+    
+    // Clear previous result and animations
+    resultEl.textContent = '';
+    resultEl.className = 'tournament-result';
+    p1El.classList.remove('tournament-winner', 'tournament-loser', 'tournament-attacking');
+    p2El.classList.remove('tournament-winner', 'tournament-loser', 'tournament-attacking');
+    
+    // Render player 1 and 2 with cards (no animation classes yet)
+    renderTournamentPlayer(p1El, battle.player1, community, false);
+    renderTournamentPlayer(p2El, battle.player2, community, false);
+    
+    // Phase 1: Show all cards (0-1.5s)
+    // Phase 2: Highlight best 5 cards for both players (at 1.5s)
+    setTimeout(() => {
+      highlightBestCards(p1El);
+      highlightBestCards(p2El);
+    }, 1500);
+    
+    // Phase 3: Both players attack simultaneously (at 3.5s)
+    setTimeout(() => {
+      p1El.classList.add('tournament-attacking');
+      p2El.classList.add('tournament-attacking');
+    }, 3500);
+    
+    // Phase 4: Apply winner/loser effects (at 4.5s)
+    setTimeout(() => {
+      p1El.classList.remove('tournament-attacking');
+      p2El.classList.remove('tournament-attacking');
+      
+      // Apply winner/loser effects
+      if (battle.winnerId === battle.player1.id) {
+        p1El.classList.add('tournament-winner');
+        p2El.classList.add('tournament-loser');
+      } else {
+        p2El.classList.add('tournament-winner');
+        p1El.classList.add('tournament-loser');
+      }
+    }, 4500);
+    
+    // Phase 5: Show result text after 3 second pause (at 7.5s)
+    setTimeout(() => {
+      const winner = battle.winnerId === battle.player1.id ? battle.player1 : battle.player2;
+      const winnerName = winner.isBot ? '🤖 ' + winner.name : winner.name;
+      resultEl.textContent = lang === 'zh' ? `🏆 ${winnerName} 胜出！` : `🏆 ${winnerName} Wins!`;
+      resultEl.classList.add('tournament-result-show');
+    }, 7500);
+  }
+  
+  function highlightBestCards(playerEl) {
+    const mons = playerEl.querySelectorAll('.tournament-mon');
+    mons.forEach(mon => {
+      if (mon.getAttribute('data-best') === 'true') {
+        mon.classList.add('in-best-hand');
+      } else {
+        mon.classList.add('not-in-best');
+      }
+    });
+  }
+  
+  function renderTournamentPlayer(playerEl, player, community, withInitialAnimation = true) {
+    const nameEl = playerEl.querySelector('.tournament-player-name');
+    const monsEl = playerEl.querySelector('.tournament-player-mons');
+    const rankEl = playerEl.querySelector('.tournament-player-rank');
+    const powerEl = playerEl.querySelector('.tournament-player-power');
+    
+    // Reset classes
+    playerEl.classList.remove('tournament-winner', 'tournament-loser');
+    
+    // Player name
+    const displayName = player.isBot ? '🤖 ' + player.name : player.name;
+    nameEl.textContent = displayName;
+    
+    // Get best 5 cards for highlighting (but don't apply classes yet)
+    const bestFiveKeys = new Set();
+    if (player.bestHand && player.bestHand.bestFive) {
+      player.bestHand.bestFive.forEach(c => {
+        bestFiveKeys.add(`${c.type}-${c.value}`);
+      });
+    }
+    
+    // Render all 7 cards (2 hand + 5 community) with separator
+    // Start with normal appearance, no highlight/dim classes
+    const handCards = player.hand.map((card) => {
+      const key = `${card.type}-${card.value}`;
+      const isInBest = bestFiveKeys.has(key);
+      return `<div class="tournament-mon hand-mon" data-best="${isInBest}" data-type="${card.type}">
+        <img src="${GL.spriteUrl(card.id)}" alt="${escHtml(getMonName(card))}" />
+        <div class="tournament-mon-label">${TYPE_EMOJI[card.type] || ''}${VALUE_LABEL(card.value)}</div>
+      </div>`;
+    }).join('');
+    
+    const communityCards = community.map((card) => {
+      const key = `${card.type}-${card.value}`;
+      const isInBest = bestFiveKeys.has(key);
+      return `<div class="tournament-mon community-mon" data-best="${isInBest}" data-type="${card.type}">
+        <img src="${GL.spriteUrl(card.id)}" alt="${escHtml(getMonName(card))}" />
+        <div class="tournament-mon-label">${TYPE_EMOJI[card.type] || ''}${VALUE_LABEL(card.value)}</div>
+      </div>`;
+    }).join('');
+    
+    monsEl.innerHTML = `
+      ${handCards}
+      <div class="tournament-card-separator"></div>
+      ${communityCards}
+    `;
+    
+    // Rank and power
+    if (player.bestHand) {
+      rankEl.textContent = player.bestHand.rankLabel;
+      powerEl.textContent = '⚡ ' + (player.bestHand.totalPower * 100).toLocaleString();
+    }
+  }
+  
+  function hideTournament() {
+    if (tournamentOverlay) {
+      tournamentOverlay.classList.add('hidden');
+    }
+  }
+
   // ─── Showdown ─────────────────────────────────────────────────────────────────
   const showdownOverlay  = $('showdown-overlay');
   const showdownTitle    = $('showdown-title');
@@ -565,8 +780,17 @@
   const countdownEl      = $('countdown');
 
   function showShowdown(state) {
-    // Always reset countdown on every showdown trigger
-    let secs = 15;
+    // Calculate total tournament animation time
+    const bracket = state.tournamentBracket || [];
+    const BATTLE_DURATION = 8000;  // Match server-side duration
+    const PAUSE_BETWEEN = 1000;    // Match server-side pause
+    const tournamentTime = bracket.length > 0 ? bracket.length * (BATTLE_DURATION + PAUSE_BETWEEN) : 0;
+    
+    // If no tournament (everyone folded), use 5s; otherwise 15s base
+    const baseSeconds = bracket.length === 0 ? 5 : 15;
+    const tournamentSeconds = Math.ceil(tournamentTime / 1000);
+    let secs = baseSeconds;
+    
     countdownEl.textContent = secs;
     clearInterval(countdownTimer);
     countdownTimer = setInterval(() => {
