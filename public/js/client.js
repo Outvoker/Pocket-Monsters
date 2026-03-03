@@ -236,30 +236,42 @@
 
   function playWaterSound(ctx) {
     const now = ctx.currentTime;
-    const duration = 1.2;
+    const duration = 1.5;
     
-    // Create filtered noise for water sound
+    // Create flowing water sound with modulated noise
     const bufferSize = ctx.sampleRate * duration;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     
+    // Generate noise with flowing pattern
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      const t = i / ctx.sampleRate;
+      // Add modulation to create flowing/splashing effect
+      const modulation = Math.sin(t * 15) * 0.3 + Math.sin(t * 30) * 0.2 + Math.sin(t * 60) * 0.1;
+      data[i] = (Math.random() * 2 - 1) * (0.8 + modulation) * (1 - t / duration * 0.5);
     }
     
     const noise = ctx.createBufferSource();
     noise.buffer = buffer;
     
+    // Use bandpass filter for flowing water frequency range
     const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 1200;
-    filter.Q.value = 1;
+    filter.type = 'bandpass';
+    filter.frequency.value = 2500;
+    filter.Q.value = 0.8;
+    
+    // Add a second filter for more natural sound
+    const filter2 = ctx.createBiquadFilter();
+    filter2.type = 'highpass';
+    filter2.frequency.value = 800;
+    filter2.Q.value = 0.5;
     
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.5, now);
+    gain.gain.linearRampToValueAtTime(0.55, now + 0.3);
     gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
     
-    noise.connect(filter).connect(gain).connect(ctx.destination);
+    noise.connect(filter).connect(filter2).connect(gain).connect(ctx.destination);
     noise.start(now);
     noise.stop(now + duration);
   }
@@ -1357,6 +1369,34 @@
           onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 96 96%22%3E%3Ctext y=%2272%22 font-size=%2272%22%3E%E2%9D%93%3C/text%3E%3C/svg%3E'" />
       </div>
       <div class="poke-mon-name">${escHtml(getMonName(card))}</div>`;
+    
+    // Add hover and click sound effects
+    let hoverTimeout = null;
+    
+    // Play sound on mouse enter (with slight delay to avoid too many sounds)
+    wrap.addEventListener('mouseenter', () => {
+      hoverTimeout = setTimeout(() => {
+        playTypeSound(card.type);
+      }, 100);
+    });
+    
+    // Cancel sound if mouse leaves quickly
+    wrap.addEventListener('mouseleave', () => {
+      if (hoverTimeout) {
+        clearTimeout(hoverTimeout);
+        hoverTimeout = null;
+      }
+    });
+    
+    // Play sound on touch/click
+    wrap.addEventListener('touchstart', (e) => {
+      playTypeSound(card.type);
+    }, { passive: true });
+    
+    wrap.addEventListener('click', () => {
+      playTypeSound(card.type);
+    });
+    
     return wrap;
   }
 
