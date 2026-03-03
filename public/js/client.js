@@ -164,6 +164,13 @@
   let tournamentAnimationActive = false;
   let tournamentAnimationComplete = false;
   let lastShowdownRound = -1; // Track which round's showdown we've animated
+  // card entry animation queue
+  let cardEntryQueue = [];
+  let isPlayingCardEntry = false;
+  // track which cards are queued or animating to prevent duplicates
+  const queuedCardKeys = new Set();
+  // track last phase to detect phase changes
+  let lastPhase = null;
 
   const TYPE_EMOJI  = { fire: '🔥', water: '💧', grass: '🌿', electric: '⚡' };
   const VALUE_LABEL = v =>
@@ -466,9 +473,20 @@
             const card  = cards[i];
             const key   = `${card.type}-${card.id}`;
             const isNew = !renderedCommunityKeys.has(key);
-            const monEl = makeMonEl(card, false, isNew, isNew ? i * 100 : 0);
-            monEl.dataset.cardKey = key;
-            el.appendChild(monEl);
+            
+            if (isNew && state.phase !== 'waiting') {
+              // Queue card entry animation for new cards
+              const slot = document.createElement('div');
+              slot.className = 'poke-slot';
+              slot.textContent = '?';
+              el.appendChild(slot);
+              queueCardEntry(card, el, i, false);
+            } else {
+              // Render immediately for existing cards or waiting phase
+              const monEl = makeMonEl(card, false, false, 0);
+              monEl.dataset.cardKey = key;
+              el.appendChild(monEl);
+            }
             renderedCommunityKeys.add(key);
           } else {
             const slot = document.createElement('div');
@@ -483,14 +501,21 @@
           const card  = cards[i];
           const key   = `${card.type}-${card.id}`;
           const isNew = !renderedCommunityKeys.has(key);
-          const monEl = makeMonEl(card, false, isNew, isNew ? 100 : 0);
-          monEl.dataset.cardKey = key;
           
-          // Replace the placeholder at position i
-          if (el.children[i] && el.children[i].classList.contains('poke-slot')) {
-            el.replaceChild(monEl, el.children[i]);
+          if (isNew && state.phase !== 'waiting') {
+            // Queue card entry animation for new cards
+            queueCardEntry(card, el, i, false);
           } else {
-            el.appendChild(monEl);
+            // Render immediately
+            const monEl = makeMonEl(card, false, false, 0);
+            monEl.dataset.cardKey = key;
+            
+            // Replace the placeholder at position i
+            if (el.children[i] && el.children[i].classList.contains('poke-slot')) {
+              el.replaceChild(monEl, el.children[i]);
+            } else {
+              el.appendChild(monEl);
+            }
           }
           
           renderedCommunityKeys.add(key);
@@ -554,10 +579,12 @@
     const hudRankEl  = $('power-hud-rank');
     const hudPwrEl   = $('power-hud-power');
 
-    // Reset tracking on new game
-    if (state.phase === 'preflop' || state.phase === 'waiting') {
+    // Reset tracking only when phase actually changes to waiting (new round)
+    if (state.phase === 'waiting' && lastPhase !== 'waiting') {
       renderedMyHandKeys.clear();
+      queuedCardKeys.clear();
     }
+    lastPhase = state.phase;
 
     if (!me || !me.hand || !me.hand.length) {
       cardsEl.innerHTML = '';
@@ -567,6 +594,7 @@
         cardsEl.appendChild(s);
       }
       if (hudEl) hudEl.classList.add('hidden');
+      return;
     }
 
     const bestKeys = new Set((me.bestHand?.bestFive || []).map(c => `${c.type}-${c.value}`));
@@ -583,10 +611,23 @@
       me.hand.forEach((card, i) => {
         const key = `${card.type}-${card.id}`;
         const isNew = !renderedMyHandKeys.has(key);
+        const isQueued = queuedCardKeys.has(key);
         const inBest = bestKeys.has(`${card.type}-${card.value}`);
-        const el = makeMonEl(card, inBest, isNew, isNew ? i * 50 : 0);
-        el.dataset.cardKey = key;
-        cardsEl.appendChild(el);
+        
+        if (isNew && !isQueued && state.phase === 'preflop') {
+          // Queue card entry animation for new hand cards in preflop
+          const slot = document.createElement('div');
+          slot.className = 'poke-slot';
+          slot.textContent = '?';
+          cardsEl.appendChild(slot);
+          queueCardEntry(card, cardsEl, i, true);
+          queuedCardKeys.add(key);
+        } else {
+          // Render immediately for existing cards or other phases
+          const el = makeMonEl(card, inBest, false, 0);
+          el.dataset.cardKey = key;
+          cardsEl.appendChild(el);
+        }
         renderedMyHandKeys.add(key);
       });
     } else {
@@ -1111,6 +1152,200 @@
       </div>
       <div class="poke-mon-name">${escHtml(getMonName(card))}</div>`;
     return wrap;
+  }
+
+  // ─── Card Entry Animation System ──────────────────────────────────────────────
+  function playCardEntryAnimation(card, targetContainer, targetIndex, isHand = false) {
+    const overlay = $('card-entry-overlay');
+    const stage = $('card-entry-stage');
+    const effectsContainer = $('card-entry-effects');
+    const particlesContainer = $('card-entry-particles');
+    
+    if (!overlay || !stage) return null;
+
+    // Create card element for center stage
+    const cardEl = makeMonEl(card, false, false, 0);
+    cardEl.style.opacity = '0';
+    cardEl.style.transition = 'none';
+    
+    // Show overlay
+    overlay.classList.remove('hidden');
+    stage.appendChild(cardEl);
+    
+    // Set effect color and type based on card type
+    const typeColors = {
+      fire: '#FF6B35',
+      water: '#29B6F6',
+      grass: '#66BB6A',
+      electric: '#FFD600'
+    };
+    effectsContainer.style.color = typeColors[card.type] || '#FFD700';
+    effectsContainer.className = `card-entry-effects ${card.type}`;
+    
+    // Create type-specific large-scale effects
+    effectsContainer.innerHTML = '';
+    
+    if (card.type === 'fire') {
+      // Fire: Multiple large flames rising from bottom (increased to 15)
+      for (let i = 0; i < 15; i++) {
+        const flame = document.createElement('div');
+        flame.className = 'effect-element';
+        const offset = (i - 7) * 50; // Spread flames horizontally
+        flame.style.left = `calc(50% + ${offset}px)`;
+        flame.style.animationDuration = `${1.2 + Math.random() * 1}s`;
+        flame.style.animationDelay = `${i * 0.1}s`;
+        flame.style.transform = `translate(-50%, 0) scale(${0.7 + Math.random() * 0.5})`;
+        effectsContainer.appendChild(flame);
+      }
+    } else if (card.type === 'grass') {
+      // Grass: Many leaves falling from top (increased to 35)
+      for (let i = 0; i < 35; i++) {
+        const leaf = document.createElement('div');
+        leaf.className = 'effect-element';
+        const offset = (Math.random() - 0.5) * 500; // Random horizontal spread
+        leaf.style.left = `calc(50% + ${offset}px)`;
+        leaf.style.animationDuration = `${2 + Math.random() * 1.5}s`;
+        leaf.style.animationDelay = `${i * 0.08}s`;
+        leaf.style.transform = `translate(-50%, 0) scale(${0.6 + Math.random() * 0.7}) rotate(${Math.random() * 360}deg)`;
+        effectsContainer.appendChild(leaf);
+      }
+    } else if (card.type === 'electric') {
+      // Electric: Lightning bolts striking from sky (increased to 12)
+      for (let i = 0; i < 12; i++) {
+        const bolt = document.createElement('div');
+        bolt.className = 'effect-element';
+        const offset = (i - 5.5) * 60; // Spread lightning bolts
+        bolt.style.left = `calc(50% + ${offset}px)`;
+        bolt.style.animationDelay = `${i * 0.2}s`;
+        bolt.style.transform = `translate(-50%, 0) rotate(${(Math.random() - 0.5) * 20}deg)`;
+        bolt.style.width = `${6 + Math.random() * 4}px`;
+        effectsContainer.appendChild(bolt);
+      }
+    } else if (card.type === 'water') {
+      // Water: Surging waves from bottom (increased to 8)
+      for (let i = 0; i < 8; i++) {
+        const wave = document.createElement('div');
+        wave.className = 'effect-element';
+        wave.style.animationDelay = `${i * 0.2}s`;
+        wave.style.transform = `translate(-50%, 0) scale(${1 + i * 0.12})`;
+        wave.style.opacity = `${0.85 - i * 0.1}`;
+        effectsContainer.appendChild(wave);
+      }
+    }
+    
+    // Create particles
+    const particleEmojis = {
+      fire: ['🔥', '✨', '💫', '⭐', '🌟'],
+      water: ['💧', '💦', '✨', '💫', '🌊'],
+      grass: ['🌿', '🍃', '✨', '💫', '🌱'],
+      electric: ['⚡', '✨', '💫', '⭐', '🌟']
+    };
+    const emojis = particleEmojis[card.type] || ['✨', '💫', '⭐'];
+    
+    particlesContainer.innerHTML = '';
+    for (let i = 0; i < 20; i++) {
+      const particle = document.createElement('div');
+      particle.className = 'card-entry-particle';
+      const angle = (i / 20) * Math.PI * 2;
+      const distance = 150 + Math.random() * 100;
+      const tx = Math.cos(angle) * distance;
+      const ty = Math.sin(angle) * distance;
+      particle.style.setProperty('--tx', `${tx}px`);
+      particle.style.setProperty('--ty', `${ty}px`);
+      particle.style.animationDelay = `${i * 30}ms`;
+      particle.textContent = emojis[i % emojis.length];
+      particlesContainer.appendChild(particle);
+    }
+    
+    // Trigger animation
+    requestAnimationFrame(() => {
+      cardEl.style.opacity = '1';
+    });
+    
+    // After center animation, move to position
+    return new Promise(resolve => {
+      setTimeout(() => {
+        // Get current card position (center of screen)
+        const cardRect = cardEl.getBoundingClientRect();
+        const currentCenterX = cardRect.left + cardRect.width / 2;
+        const currentCenterY = cardRect.top + cardRect.height / 2;
+        
+        // Get target container position
+        const targetRect = targetContainer.getBoundingClientRect();
+        
+        // Calculate the center of the target container
+        const containerCenterX = targetRect.left + targetRect.width / 2;
+        const containerCenterY = targetRect.top + targetRect.height / 2;
+        
+        // Calculate card dimensions at normal scale (110px for community, 108px for hand)
+        const cardWidth = isHand ? 108 : 110;
+        const gap = 10;
+        
+        // Calculate total width of all cards with gaps
+        const totalCards = targetContainer.querySelectorAll('.poke-mon, .poke-slot').length;
+        const totalWidth = totalCards * cardWidth + (totalCards - 1) * gap;
+        
+        // Calculate starting X position to center all cards
+        const startX = containerCenterX - totalWidth / 2;
+        
+        // Calculate final center position for this specific card
+        const finalCenterX = startX + targetIndex * (cardWidth + gap) + cardWidth / 2;
+        const finalCenterY = containerCenterY;
+        
+        // Calculate how much to move from current position
+        const deltaX = finalCenterX - currentCenterX;
+        const deltaY = finalCenterY - currentCenterY;
+        
+        // Enable transition and move to final position
+        cardEl.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+        // Keep the translate(-50%, -50%) from CSS animation, just change position and scale
+        cardEl.style.left = `calc(50% + ${deltaX}px)`;
+        cardEl.style.top = `calc(50% + ${deltaY}px)`;
+        cardEl.style.transform = 'translate(-50%, -50%) scale(0.4)';
+        
+        // After move animation completes
+        setTimeout(() => {
+          // Hide overlay
+          overlay.classList.add('hidden');
+          stage.innerHTML = '';
+          particlesContainer.innerHTML = '';
+          
+          // Add card to actual target container
+          const finalCard = makeMonEl(card, false, false, 0);
+          const key = `${card.type}-${card.id}`;
+          finalCard.dataset.cardKey = key;
+          
+          if (targetContainer.children[targetIndex]) {
+            targetContainer.replaceChild(finalCard, targetContainer.children[targetIndex]);
+          } else {
+            targetContainer.appendChild(finalCard);
+          }
+          
+          resolve();
+        }, 650);
+      }, 1200);
+    });
+  }
+
+  async function processCardEntryQueue() {
+    if (isPlayingCardEntry || cardEntryQueue.length === 0) return;
+    
+    isPlayingCardEntry = true;
+    
+    while (cardEntryQueue.length > 0) {
+      const entry = cardEntryQueue.shift();
+      await playCardEntryAnimation(entry.card, entry.targetContainer, entry.targetIndex, entry.isHand);
+      // Remove from queued set after animation completes
+      const key = `${entry.card.type}-${entry.card.id}`;
+      queuedCardKeys.delete(key);
+    }
+    
+    isPlayingCardEntry = false;
+  }
+
+  function queueCardEntry(card, targetContainer, targetIndex, isHand = false) {
+    cardEntryQueue.push({ card, targetContainer, targetIndex, isHand });
+    processCardEntryQueue();
   }
 
   function miniMonHtml(card, large = false) {
