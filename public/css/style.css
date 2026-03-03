@@ -1859,6 +1859,19 @@ input[type="text"]:focus, input[type="number"]:focus {
   transition: all .3s ease;
 }
 
+.tournament-mon-name {
+  font-size: 11px;
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 4px;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tournament-mon-label {
   font-size: 13px;
   color: #fff;
@@ -2365,6 +2378,7 @@ input[type="text"]:focus, input[type="number"]:focus {
     margin: 0 4px;
   }
   .tournament-mon img { width: 70px; height: 70px; }
+  .tournament-mon-name { font-size: 9px; max-width: 70px; margin-top: 2px; }
   .tournament-mon-label { font-size: 11px; }
   .tournament-player-rank { font-size: 12px; }
   .tournament-player-power { font-size: 12px; }

@@ -456,7 +456,11 @@ function autoRevealBoard(room) {
 function proceedToNextPhase(room) {
   room.needsToAct.clear();
   const nf = room.nonFoldedPlayers();
-  if (nf.length <= 1) { endGame(room, nf); return; }
+  if (nf.length <= 1) {
+    room.tournamentBracket = [];  // Clear bracket when everyone folds
+    endGame(room, nf);
+    return;
+  }
 
   // All remaining are all-in — reveal board dramatically card by card
   if (room.activePlayers().length === 0 && room.community.length < 5) {

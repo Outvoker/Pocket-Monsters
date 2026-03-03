@@ -273,7 +273,11 @@
 
     // ─── BGM switch: lobby vs battle ─────────────────────────────────────────
     if (typeof window.switchBgm === 'function') {
-      window.switchBgm(state.phase === 'waiting' ? window.BGM_LOBBY : window.BGM_BATTLE);
+      const targetBgm = state.phase === 'waiting' ? window.BGM_LOBBY : window.BGM_BATTLE;
+      console.log('[renderGame] Phase:', state.phase, 'Target BGM:', targetBgm);
+      window.switchBgm(targetBgm);
+    } else {
+      console.log('[renderGame] switchBgm not available yet');
     }
 
     const phaseKey   = state.phase;
@@ -577,6 +581,11 @@
     });
   }
 
+  // ─── Pokémon name helper ──────────────────────────────────────────────────────
+  function getMonName(card) {
+    return (lang === 'zh' && card.zhName) ? card.zhName : card.name;
+  }
+
   // ─── Tournament Animations ───────────────────────────────────────────────────
   const tournamentOverlay = $('tournament-overlay');
   
@@ -741,6 +750,7 @@
       const isInBest = bestFiveKeys.has(key);
       return `<div class="tournament-mon hand-mon" data-best="${isInBest}" data-type="${card.type}">
         <img src="${GL.spriteUrl(card.id)}" alt="${escHtml(getMonName(card))}" />
+        <div class="tournament-mon-name">${escHtml(getMonName(card))}</div>
         <div class="tournament-mon-label">${TYPE_EMOJI[card.type] || ''}${VALUE_LABEL(card.value)}</div>
       </div>`;
     }).join('');
@@ -750,6 +760,7 @@
       const isInBest = bestFiveKeys.has(key);
       return `<div class="tournament-mon community-mon" data-best="${isInBest}" data-type="${card.type}">
         <img src="${GL.spriteUrl(card.id)}" alt="${escHtml(getMonName(card))}" />
+        <div class="tournament-mon-name">${escHtml(getMonName(card))}</div>
         <div class="tournament-mon-label">${TYPE_EMOJI[card.type] || ''}${VALUE_LABEL(card.value)}</div>
       </div>`;
     }).join('');
@@ -944,10 +955,6 @@
   }
 
   // ─── Pokémon element builders ────────────────────────────────────────────────
-  function getMonName(card) {
-    return (lang === 'zh' && card.zhName) ? card.zhName : card.name;
-  }
-
   const TYPE_COLORS = { fire:'#FF6B35', water:'#29B6F6', grass:'#66BB6A', electric:'#FFD600' };
 
   // Large showdown sprite
@@ -1067,6 +1074,7 @@
 
     let currentBgmUrl = null;
     let userInteracted = false;
+    let isSwitching = false;  // Prevent concurrent switches
     bgm.volume = 0.35;
 
     // Update slider display to match initial volume
@@ -1094,43 +1102,98 @@
 
     // Switch BGM track (crossfade-ish: fade out → swap → fade in)
     window.switchBgm = function(url) {
-      if (currentBgmUrl === url) return;
+      console.log('[BGM] switchBgm called:', url, 'current:', currentBgmUrl, 'userInteracted:', userInteracted, 'isSwitching:', isSwitching);
+      
+      // If already switching to this URL or it's the current URL, skip
+      if (currentBgmUrl === url && !bgm.paused) {
+        console.log('[BGM] Already playing this URL');
+        return;
+      }
+      
+      // Update target URL immediately
       currentBgmUrl = url;
-      if (!userInteracted) return; // will be played on next interaction
-      const targetVol = bgm.volume;
-      // Fade out
+      
+      if (!userInteracted) {
+        // Store the desired BGM URL, will be played on first interaction
+        console.log('[BGM] User not interacted yet, storing URL for later');
+        return;
+      }
+      
+      // If already switching, cancel and start new switch immediately
+      if (isSwitching) {
+        console.log('[BGM] Already switching, forcing immediate switch to:', url);
+        isSwitching = false;
+      }
+      
+      const targetVol = parseFloat(volSlider?.value || 0.35);
+      
+      // If BGM is not playing (failed to start or paused), try direct switch
+      if (bgm.paused || !bgm.src) {
+        console.log('[BGM] BGM not playing, attempting direct switch');
+        bgm.src = url;
+        bgm.volume = targetVol;
+        bgm.play().catch(err => {
+          console.log('[BGM] Autoplay blocked:', err);
+        }).then(() => {
+          console.log('[BGM] Playing:', url);
+        });
+        return;
+      }
+      
+      // Mark as switching
+      isSwitching = true;
+      
+      // Quick fade out (faster for better responsiveness)
+      const fadeOutStep = 0.08;  // Faster fade
       let fadeOut = setInterval(() => {
-        if (bgm.volume > 0.04) {
-          bgm.volume = Math.max(0, bgm.volume - 0.04);
+        if (bgm.volume > fadeOutStep) {
+          bgm.volume = Math.max(0, bgm.volume - fadeOutStep);
         } else {
           clearInterval(fadeOut);
           bgm.pause();
           bgm.src = url;
           bgm.volume = 0;
-          bgm.play().catch(() => {});
-          // Fade in
-          let fadeIn = setInterval(() => {
-            if (bgm.volume < targetVol - 0.04) {
-              bgm.volume = Math.min(targetVol, bgm.volume + 0.04);
-            } else {
-              bgm.volume = targetVol;
-              clearInterval(fadeIn);
-            }
-          }, 40);
+          bgm.play().catch(err => {
+            console.log('[BGM] play failed:', err);
+            bgm.volume = targetVol; // Restore volume for next attempt
+            isSwitching = false;
+          }).then(() => {
+            console.log('[BGM] Now playing:', url);
+            // Quick fade in
+            let fadeIn = setInterval(() => {
+              if (bgm.volume < targetVol - fadeOutStep) {
+                bgm.volume = Math.min(targetVol, bgm.volume + fadeOutStep);
+              } else {
+                bgm.volume = targetVol;
+                clearInterval(fadeIn);
+                isSwitching = false;
+              }
+            }, 30);
+          });
         }
-      }, 40);
+      }, 30);
     };
 
     // Auto-start BGM on first user interaction (browsers block autoplay)
     function tryPlayBgm() {
+      if (userInteracted) return; // Already initialized
+      console.log('[BGM] First user interaction detected');
       userInteracted = true;
       const url = currentBgmUrl || BGM_LOBBY;
       currentBgmUrl = url;
       bgm.src = url;
-      bgm.play().catch(() => {});
+      bgm.volume = parseFloat(volSlider?.value || 0.35);
+      console.log('[BGM] Attempting to play:', url);
+      bgm.play().catch(err => {
+        console.log('[BGM] Initial autoplay blocked:', err);
+        // Will retry on next switchBgm call
+      }).then(() => {
+        console.log('[BGM] Successfully started playing:', url);
+      });
     }
-    document.addEventListener('click', tryPlayBgm, { once: true });
-    document.addEventListener('touchstart', tryPlayBgm, { once: true });
+    document.addEventListener('click', tryPlayBgm);
+    document.addEventListener('touchstart', tryPlayBgm);
+    document.addEventListener('keydown', tryPlayBgm);
 
     // Default to lobby BGM on load
     window.switchBgm(BGM_LOBBY);
