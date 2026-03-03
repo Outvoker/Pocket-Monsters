@@ -296,36 +296,95 @@
     // Clear existing particles
     particlesContainer.innerHTML = '';
 
-    const particles = ACTION_PARTICLES[action] || ['✨'];
-    const count = action === 'allin' ? 20 : 12;
+    if (action === 'raise') {
+      // Create upward energy beams for raise action
+      for (let i = 0; i < 12; i++) {
+        const beam = document.createElement('div');
+        beam.className = 'action-announcement-particle visual-effect';
+        
+        const x = 20 + (i * 6); // Spread beams across screen
+        const delay = i * 80;
+        
+        beam.style.cssText = `
+          left: ${x}%;
+          bottom: 0;
+          animation-delay: ${delay}ms;
+        `;
+        
+        particlesContainer.appendChild(beam);
+        beam.addEventListener('animationend', () => beam.remove());
+      }
+    } else if (action === 'allin') {
+      // Create explosive burst for allin action
+      // Main explosion bursts
+      for (let i = 0; i < 16; i++) {
+        const burst = document.createElement('div');
+        burst.className = 'action-announcement-particle visual-effect';
+        
+        const angle = (i / 16) * Math.PI * 2;
+        const distance = 150 + Math.random() * 100;
+        const tx = Math.cos(angle) * distance + 'px';
+        const ty = Math.sin(angle) * distance + 'px';
+        
+        burst.style.cssText = `
+          left: 50%;
+          top: 50%;
+          --tx: ${tx};
+          --ty: ${ty};
+          animation-delay: ${i * 40}ms;
+        `;
+        
+        particlesContainer.appendChild(burst);
+        burst.addEventListener('animationend', () => burst.remove());
+      }
+      
+      // Add shockwave rings
+      for (let i = 0; i < 4; i++) {
+        const shockwave = document.createElement('div');
+        shockwave.className = 'action-announcement-particle shockwave';
+        
+        shockwave.style.cssText = `
+          left: 50%;
+          top: 50%;
+          animation-delay: ${i * 200}ms;
+        `;
+        
+        particlesContainer.appendChild(shockwave);
+        shockwave.addEventListener('animationend', () => shockwave.remove());
+      }
+    } else {
+      // For other actions (fold, check, call), use emoji particles
+      const particles = ACTION_PARTICLES[action] || ['✨'];
+      const count = 12;
 
-    for (let i = 0; i < count; i++) {
-      const particle = document.createElement('div');
-      particle.className = 'action-announcement-particle';
-      
-      // Random position
-      const x = Math.random() * 100;
-      const y = Math.random() * 100;
-      
-      // Random trajectory
-      const tx = (Math.random() - 0.5) * 200 + 'px';
-      const ty = -(Math.random() * 150 + 50) + 'px';
-      const rotate = (Math.random() * 720 - 360) + 'deg';
-      
-      particle.style.cssText = `
-        left: ${x}%;
-        top: ${y}%;
-        --tx: ${tx};
-        --ty: ${ty};
-        --rotate: ${rotate};
-        animation-delay: ${i * 50}ms;
-      `;
-      
-      particle.textContent = particles[i % particles.length];
-      particlesContainer.appendChild(particle);
-      
-      // Remove after animation
-      particle.addEventListener('animationend', () => particle.remove());
+      for (let i = 0; i < count; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'action-announcement-particle';
+        
+        // Random position
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        
+        // Random trajectory
+        const tx = (Math.random() - 0.5) * 200 + 'px';
+        const ty = -(Math.random() * 150 + 50) + 'px';
+        const rotate = (Math.random() * 720 - 360) + 'deg';
+        
+        particle.style.cssText = `
+          left: ${x}%;
+          top: ${y}%;
+          --tx: ${tx};
+          --ty: ${ty};
+          --rotate: ${rotate};
+          animation-delay: ${i * 50}ms;
+        `;
+        
+        particle.textContent = particles[i % particles.length];
+        particlesContainer.appendChild(particle);
+        
+        // Remove after animation
+        particle.addEventListener('animationend', () => particle.remove());
+      }
     }
   }
   // ─── Toast ──────────────────────────────────────────────────────────────────
