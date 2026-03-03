@@ -172,6 +172,153 @@
   // track last phase to detect phase changes
   let lastPhase = null;
 
+  // ─── Sound Effects for Pokemon Types ──────────────────────────────────────────
+  let audioContext = null;
+  
+  function initAudioContext() {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioContext;
+  }
+
+  function playTypeSound(type) {
+    try {
+      const ctx = initAudioContext();
+      
+      if (type === 'fire') {
+        // Fire: Crackling fire sound
+        playFireSound(ctx);
+      } else if (type === 'water') {
+        // Water: Wave/splash sound
+        playWaterSound(ctx);
+      } else if (type === 'electric') {
+        // Electric: Thunder/zap sound
+        playElectricSound(ctx);
+      } else if (type === 'grass') {
+        // Grass: Wind through leaves sound
+        playGrassSound(ctx);
+      }
+    } catch (e) {
+      console.warn('Audio playback failed:', e);
+    }
+  }
+
+  function playFireSound(ctx) {
+    const now = ctx.currentTime;
+    const duration = 1.5;
+    
+    // Create noise for crackling effect
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.3));
+    }
+    
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 800;
+    filter.Q.value = 2;
+    
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.6, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+    
+    noise.connect(filter).connect(gain).connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + duration);
+  }
+
+  function playWaterSound(ctx) {
+    const now = ctx.currentTime;
+    const duration = 1.2;
+    
+    // Create filtered noise for water sound
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    }
+    
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 1200;
+    filter.Q.value = 1;
+    
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+    
+    noise.connect(filter).connect(gain).connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + duration);
+  }
+
+  function playElectricSound(ctx) {
+    const now = ctx.currentTime;
+    const duration = 0.8;
+    
+    // Create sharp electric zap sound
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(100, now + duration);
+    
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.7, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 2000;
+    filter.Q.value = 5;
+    
+    osc.connect(filter).connect(gain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + duration);
+  }
+
+  function playGrassSound(ctx) {
+    const now = ctx.currentTime;
+    const duration = 1.5;
+    
+    // Create soft wind/rustling sound
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+      const t = i / ctx.sampleRate;
+      data[i] = (Math.random() * 2 - 1) * Math.sin(t * 3) * 0.5;
+    }
+    
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 400;
+    filter.Q.value = 1;
+    
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.45, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+    
+    noise.connect(filter).connect(gain).connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + duration);
+  }
+
   const TYPE_EMOJI  = { fire: '🔥', water: '💧', grass: '🌿', electric: '⚡' };
   const VALUE_LABEL = v =>
     v === 13 ? 'A' : v === 12 ? 'K' : v === 11 ? 'Q' : v === 10 ? 'J' : String(v + 1);
@@ -1222,6 +1369,9 @@
     
     if (!overlay || !stage) return null;
 
+    // Play type-specific sound effect
+    playTypeSound(card.type);
+
     // Create card element for center stage
     const cardEl = makeMonEl(card, false, false, 0);
     cardEl.style.opacity = '0';
@@ -1472,7 +1622,7 @@
     let currentBgmUrl = null;
     let userInteracted = false;
     let isSwitching = false;  // Prevent concurrent switches
-    bgm.volume = 0.35;
+    bgm.volume = 0.15;
 
     // Update slider display to match initial volume
     if (volSlider) {
@@ -1579,7 +1729,7 @@
       const url = currentBgmUrl || BGM_LOBBY;
       currentBgmUrl = url;
       bgm.src = url;
-      bgm.volume = parseFloat(volSlider?.value || 0.35);
+      bgm.volume = parseFloat(volSlider?.value || 0.15);
       console.log('[BGM] Attempting to play:', url);
       bgm.play().catch(err => {
         console.log('[BGM] Initial autoplay blocked:', err);
