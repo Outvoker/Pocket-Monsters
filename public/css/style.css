@@ -889,24 +889,35 @@ input[type="text"]:focus, input[type="number"]:focus {
   color: rgba(255,214,0,.9);
 }
 
-/* Highlight best-five mons with celebration animation */
+/* Highlight best-five mons with type-colored ring and bounce */
 .poke-mon.in-best .poke-mon-sprite-wrap {
-  filter: drop-shadow(0 0 15px rgba(255,215,0,.9)) brightness(1.2);
-  outline: 3px solid var(--gold);
-  border-radius: 50%;
-  animation: celebrationBounce 1s ease-in-out infinite, glowPulse 2s ease-in-out infinite;
-  position: relative;
+  animation: bestCardBounce 1s ease-in-out infinite;
+  animation-delay: 0s !important;
 }
 
-.poke-mon.in-best .poke-mon-sprite-wrap::before {
-  content: '';
-  position: absolute;
-  inset: -5px;
-  border-radius: 50%;
-  background: linear-gradient(45deg, transparent, rgba(255,215,0,0.3), transparent);
-  background-size: 200% 200%;
-  animation: shimmer 2s linear infinite;
-  pointer-events: none;
+.poke-mon.in-best.fire .poke-mon-sprite-wrap {
+  box-shadow: 0 0 0 3px rgba(255,107,53,0.8), 0 0 20px rgba(255,107,53,0.4);
+}
+
+.poke-mon.in-best.water .poke-mon-sprite-wrap {
+  box-shadow: 0 0 0 3px rgba(41,182,246,0.8), 0 0 20px rgba(41,182,246,0.4);
+}
+
+.poke-mon.in-best.grass .poke-mon-sprite-wrap {
+  box-shadow: 0 0 0 3px rgba(102,187,106,0.8), 0 0 20px rgba(102,187,106,0.4);
+}
+
+.poke-mon.in-best.electric .poke-mon-sprite-wrap {
+  box-shadow: 0 0 0 3px rgba(255,214,0,0.8), 0 0 20px rgba(255,214,0,0.4);
+}
+
+@keyframes bestCardBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-10px) scale(1.05);
+  }
 }
 
 .poke-value-badge {
@@ -1261,6 +1272,8 @@ input[type="text"]:focus, input[type="number"]:focus {
   text-align: center;
   padding: 5px 8px;
   transition: border-color .2s;
+  -webkit-appearance: none;
+  appearance: none;
   -moz-appearance: textfield;
 }
 #raise-input[type="number"]::-webkit-inner-spin-button,
@@ -1665,6 +1678,26 @@ input[type="text"]:focus, input[type="number"]:focus {
   position: relative;
   z-index: 1;
 }
+
+/* Tied winners - more compact display */
+.showdown-winner-tied {
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  background: rgba(255,215,0,.1);
+  border: 2px solid rgba(255,215,0,.4);
+}
+
+.showdown-winner-tied .showdown-winner-name {
+  font-size: 22px;
+}
+
+.showdown-winner-tied .showdown-mons-epic {
+  gap: 6px;
+}
+
+.showdown-winner-tied .showdown-mon-big {
+  transform: scale(0.9);
+}
 .showdown-cards {
   display: flex;
   gap: 8px;
@@ -1720,6 +1753,13 @@ input[type="text"]:focus, input[type="number"]:focus {
 .round-result-row.is-winner {
   background: rgba(255,215,0,.12);
   color: #fff;
+}
+.round-result-row.folded-player {
+  opacity: 0.7;
+  background: rgba(255,255,255,.02);
+}
+.round-result-row.folded-player .rr-name {
+  color: #999;
 }
 .rr-place { font-size: 14px; text-align: center; min-width: 24px; flex-shrink: 0; }
 .rr-name  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

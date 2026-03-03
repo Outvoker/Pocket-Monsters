@@ -67,7 +67,7 @@ class RoomState {
         bet: p.bet, totalBet: p.totalBet, connected: p.connected, spectator: !!p.spectator,
         handCount: p.hand ? p.hand.length : 0,
         hand:     (this.phase === GL.PHASES.SHOWDOWN || p.id === forPlayerId) ? p.hand : null,
-        bestHand: (this.phase === GL.PHASES.SHOWDOWN) ? p.bestHand : null,
+        bestHand: (this.phase === GL.PHASES.SHOWDOWN || p.id === forPlayerId) ? p.bestHand : null,
         isBot:    !!p.isBot,
       })),
     };
@@ -170,11 +170,11 @@ function botDecide(room, bot) {
 
   // Strong hand (rank 5-6: flush, full house, or good pairs/high cards)
   if (strength > 0.55) {
-    // Rarely fold strong hands - only 2% fold rate
-    if (r < 0.02) return { action: GL.ACTIONS.FOLD };
+    // Almost never fold strong hands - only 1% fold rate
+    if (r < 0.01) return { action: GL.ACTIONS.FOLD };
     
-    // More aggressive raising - 70% raise rate
-    if (canRaise && r < 0.70) {
+    // More aggressive raising - 80% raise rate
+    if (canRaise && r < 0.80) {
       const minR = room.currentBet + bb;
       const maxR = bot.bet + bot.chips;
       if (minR < maxR) {
@@ -186,18 +186,18 @@ function botDecide(room, bot) {
       }
     }
     
-    // Much more willing to call large bets - up to 60% of chips
-    if (toCall <= bot.chips * 0.6) return { action: GL.ACTIONS.CALL };
-    // 85% chance to call even larger bets
-    if (r < 0.85 && toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
+    // Much more willing to call large bets - up to 75% of chips
+    if (toCall <= bot.chips * 0.75) return { action: GL.ACTIONS.CALL };
+    // 90% chance to call even larger bets
+    if (r < 0.90 && toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
     return { action: GL.ACTIONS.FOLD };
   }
 
   // Medium hand (rank 3-4: three of a kind, straight, or decent cards)
   if (strength > 0.35) {
     if (toCall === 0) {
-      // Post-flop: bet more aggressively - 45% raise rate
-      if (isPostflop && canRaise && r < 0.45) {
+      // Post-flop: bet more aggressively - 55% raise rate
+      if (isPostflop && canRaise && r < 0.55) {
         const minR = bb;
         const maxR = bot.bet + bot.chips;
         if (minR < maxR) {
@@ -205,8 +205,8 @@ function botDecide(room, bot) {
           return { action: GL.ACTIONS.RAISE, amount: amt };
         }
       }
-      // Pre-flop: more bluff raises - 25% rate
-      if (isPreflop && canRaise && r < 0.25) {
+      // Pre-flop: more bluff raises - 35% rate
+      if (isPreflop && canRaise && r < 0.35) {
         const minR = bb;
         const maxR = bot.bet + bot.chips;
         if (minR < maxR) {
@@ -217,36 +217,36 @@ function botDecide(room, bot) {
       return { action: GL.ACTIONS.CHECK };
     }
     
-    // More willing to call - up to 35% of chips
-    if (toCall <= bot.chips * 0.35) {
+    // More willing to call - up to 50% of chips
+    if (toCall <= bot.chips * 0.5) {
       return { action: GL.ACTIONS.CALL };
     }
     
-    // Better pot odds calculation - only fold 20% of the time
-    if (r < 0.20) return { action: GL.ACTIONS.FOLD };
-    if (toCall <= bot.chips * 0.5) return { action: GL.ACTIONS.CALL };
+    // Better pot odds calculation - only fold 10% of the time
+    if (r < 0.10) return { action: GL.ACTIONS.FOLD };
+    if (toCall <= bot.chips * 0.65) return { action: GL.ACTIONS.CALL };
     return { action: GL.ACTIONS.FOLD };
   }
 
   // Weak hand
   if (toCall === 0) {
-    // Post-flop: more bluffing - 20% rate
-    if (isPostflop && canRaise && r < 0.20 && bot.chips > bb * 5) {
+    // Post-flop: more bluffing - 30% rate
+    if (isPostflop && canRaise && r < 0.30 && bot.chips > bb * 5) {
       const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), bot.chips);
       return { action: GL.ACTIONS.RAISE, amount: amt };
     }
-    // Pre-flop: more bluffing - 10% rate
-    if (isPreflop && canRaise && r < 0.10 && bot.chips > bb * 5) {
+    // Pre-flop: more bluffing - 20% rate
+    if (isPreflop && canRaise && r < 0.20 && bot.chips > bb * 5) {
       const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), bot.chips);
       return { action: GL.ACTIONS.RAISE, amount: amt };
     }
     return { action: GL.ACTIONS.CHECK };
   }
   
-  // More willing to call with weak hands - fold only 65% of the time
-  if (r < 0.65) return { action: GL.ACTIONS.FOLD };
-  if (toCall <= bb * 2 && bot.chips > bb * 10) return { action: GL.ACTIONS.CALL }; // call up to 2x BB
-  if (toCall <= bot.chips * 0.15) return { action: GL.ACTIONS.CALL }; // call small bets
+  // More willing to call with weak hands - fold only 50% of the time
+  if (r < 0.50) return { action: GL.ACTIONS.FOLD };
+  if (toCall <= bb * 3 && bot.chips > bb * 10) return { action: GL.ACTIONS.CALL }; // call up to 3x BB
+  if (toCall <= bot.chips * 0.20) return { action: GL.ACTIONS.CALL }; // call small bets up to 20% of chips
   return { action: GL.ACTIONS.FOLD };
 }
 
@@ -344,6 +344,16 @@ function getRoomList() {
     .map(r => ({ id:r.id, hostName:r.hostName, playerCount:r.players.length, maxPlayers:r.maxPlayers }));
 }
 function emitGameState(room) {
+  // Calculate bestHand for all players who have cards
+  for (const p of room.players) {
+    if (p.hand && p.hand.length > 0 && room.community) {
+      const allCards = [...p.hand, ...room.community];
+      if (allCards.length >= 2) {
+        p.bestHand = GL.evaluateBestHand(allCards);
+      }
+    }
+  }
+  
   for (const p of room.players) {
     if (isBotId(p.id)) continue;
     const sock = io.sockets.sockets.get(p.id);
@@ -435,14 +445,15 @@ function checkAndAdvance(room) {
 // Auto-reveal remaining community cards one by one when all players are all-in
 function autoRevealBoard(room) {
   const steps = [];
-  if (room.community.length < 3) steps.push({ phase: GL.PHASES.FLOP,  limit: 3 });
-  if (room.community.length < 4) steps.push({ phase: GL.PHASES.TURN,  limit: 4 });
-  if (room.community.length < 5) steps.push({ phase: GL.PHASES.RIVER, limit: 5 });
+  if (room.community.length < 3) steps.push({ phase: GL.PHASES.FLOP,  limit: 3, count: 3 });
+  if (room.community.length < 4) steps.push({ phase: GL.PHASES.TURN,  limit: 4, count: 1 });
+  if (room.community.length < 5) steps.push({ phase: GL.PHASES.RIVER, limit: 5, count: 1 });
 
   room._autoRevealing = true;   // suppress bot scheduling while we reveal
   
-  const initialDelay = 2000;  // 首次发牌前等待2秒
-  const cardInterval = 3000;  // 每张牌之间间隔3秒
+  const singleCardTime = 2200; // 单张卡片动画时间（客户端1.85秒 + 缓冲0.35秒）
+  // 如果在preflop阶段all-in，需要等待手牌动画完成（2张手牌 × 2.2秒 = 4.4秒）+ 额外缓冲1秒
+  const initialDelay = room.phase === GL.PHASES.PREFLOP ? 5500 : 2000;
   
   let delay = initialDelay;
   for (const step of steps) {
@@ -452,12 +463,14 @@ function autoRevealBoard(room) {
       while (room.community.length < step.limit) room.community.push(dealCard(room));
       emitGameState(room);
     }, delay);
-    delay += cardInterval;
+    // 根据发牌数量计算下一步延迟（多张牌需要更多时间）
+    delay += step.count * singleCardTime;
   }
+  // 最后一批牌发完后，额外等待确保动画完成
   setTimeout(() => {
     room._autoRevealing = false;
     doShowdown(room);
-  }, delay);
+  }, delay + 500); // 额外500ms缓冲
 }
 
 function proceedToNextPhase(room) {
@@ -506,8 +519,9 @@ function doShowdown(room) {
   
   for (const p of nf) p.bestHand = GL.evaluateBestHand([...p.hand, ...room.community]);
   nf.sort((a,b) => GL.compareHandResult(b.bestHand, a.bestHand));
-  const topPower = nf[0].bestHand.totalPower;
-  const winners  = nf.filter(p => p.bestHand.totalPower === topPower);
+  // Find all players with the same hand strength as the top player (ties)
+  const topHand = nf[0].bestHand;
+  const winners = nf.filter(p => GL.compareHandResult(p.bestHand, topHand) === 0);
   
   // Generate tournament bracket for animation
   room.tournamentBracket = generateTournamentBracket(nf);
@@ -566,9 +580,22 @@ function endGame(room, winners) {
   const startChips = {};
   for (const p of room.players) startChips[p.id] = p.chips + (p.totalBet || 0);
 
-  const share = winners.length ? Math.floor(room.pot / winners.length) : 0;
-  for (const w of winners) w.chips += share;
-  if (winners.length) winners[0].chips += room.pot - share * winners.length;
+  // Distribute pot evenly among winners (standard poker rule for ties)
+  if (winners.length > 0) {
+    const share = Math.floor(room.pot / winners.length);
+    const remainder = room.pot - share * winners.length;
+    
+    // Give each winner their equal share
+    for (const w of winners) {
+      w.chips += share;
+    }
+    
+    // Distribute remainder chips one at a time to winners in order
+    // This ensures the most fair distribution when pot doesn't divide evenly
+    for (let i = 0; i < remainder; i++) {
+      winners[i].chips += 1;
+    }
+  }
 
   // Per-player chip delta for the result panel
   room.roundResults = room.players

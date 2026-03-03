@@ -667,6 +667,14 @@
   function renderCommunity(state) {
     const cards  = state.community || [];
     const el     = $('community-cards');
+    const me     = state.players.find(p => p.id === myId);
+
+    // Calculate which community cards are in best hand
+    const totalCards = (me?.hand?.length || 0) + cards.length;
+    const shouldHighlight = totalCards >= 5;
+    const bestKeys = shouldHighlight && me?.bestHand?.bestFive
+      ? new Set(me.bestHand.bestFive.map(c => `${c.type}-${c.id}`))
+      : new Set();
 
     // On new game start the community will be empty; reset tracking
     if (state.phase === 'preflop' || state.phase === 'waiting') {
@@ -691,6 +699,7 @@
             const card  = cards[i];
             const key   = `${card.type}-${card.id}`;
             const isNew = !renderedCommunityKeys.has(key);
+            const inBest = bestKeys.has(key);
             
             if (isNew && state.phase !== 'waiting') {
               // Queue card entry animation for new cards
@@ -701,7 +710,7 @@
               queueCardEntry(card, el, i, false);
             } else {
               // Render immediately for existing cards or waiting phase
-              const monEl = makeMonEl(card, false, false, 0);
+              const monEl = makeMonEl(card, inBest, false, 0);
               monEl.dataset.cardKey = key;
               el.appendChild(monEl);
             }
@@ -719,13 +728,14 @@
           const card  = cards[i];
           const key   = `${card.type}-${card.id}`;
           const isNew = !renderedCommunityKeys.has(key);
+          const inBest = bestKeys.has(key);
           
           if (isNew && state.phase !== 'waiting') {
             // Queue card entry animation for new cards
             queueCardEntry(card, el, i, false);
           } else {
             // Render immediately
-            const monEl = makeMonEl(card, false, false, 0);
+            const monEl = makeMonEl(card, inBest, false, 0);
             monEl.dataset.cardKey = key;
             
             // Replace the placeholder at position i
@@ -740,6 +750,20 @@
         }
       }
     }
+    
+    // Always update in-best status for all existing community cards
+    Array.from(el.children).forEach((monEl, i) => {
+      if (monEl.classList.contains('poke-mon') && i < cards.length) {
+        const card = cards[i];
+        const key = `${card.type}-${card.id}`;
+        const inBest = bestKeys.has(key);
+        if (inBest) {
+          monEl.classList.add('in-best');
+        } else {
+          monEl.classList.remove('in-best');
+        }
+      }
+    });
   }
 
   // ─── Opponents ───────────────────────────────────────────────────────────────
@@ -815,53 +839,85 @@
       return;
     }
 
-    const bestKeys = new Set((me.bestHand?.bestFive || []).map(c => `${c.type}-${c.value}`));
+    // Only highlight best 5 cards when we have at least 5 total cards
+    const totalCards = me.hand.length + (state.community?.length || 0);
+    const shouldHighlight = totalCards >= 5;
+    const bestKeys = shouldHighlight 
+      ? new Set((me.bestHand?.bestFive || []).map(c => `${c.type}-${c.id}`))
+      : new Set();
+
+    // Show/update power HUD if we have best hand data
+    if (me.bestHand && hudEl && hudRankEl && hudPwrEl) {
+      hudRankEl.textContent = me.bestHand.rankLabel || '';
+      hudPwrEl.textContent = me.bestHand.totalPower != null 
+        ? (me.bestHand.totalPower * 100).toLocaleString() 
+        : '';
+      hudEl.classList.remove('hidden');
+    } else if (hudEl) {
+      hudEl.classList.add('hidden');
+    }
 
     // Only clear and re-render if hand composition changed
     const currentHandKeys = me.hand.map(c => `${c.type}-${c.id}`).join(',');
     const existingHandKeys = Array.from(cardsEl.children)
-      .filter(el => el.classList.contains('poke-mon'))
-      .map(el => el.dataset.cardKey)
+      .filter(el => el.classList.contains('poke-mon') || el.classList.contains('poke-slot'))
+      .map(el => el.dataset.cardKey || '')
       .join(',');
 
     if (currentHandKeys !== existingHandKeys) {
       cardsEl.innerHTML = '';
+      // Clear tracking when we clear DOM, but preserve queued cards
+      const queuedKeys = new Set(queuedCardKeys);
+      renderedMyHandKeys.clear();
+      // Re-add queued cards to rendered set to prevent re-queuing
+      queuedKeys.forEach(k => renderedMyHandKeys.add(k));
+      
       me.hand.forEach((card, i) => {
         const key = `${card.type}-${card.id}`;
         const isNew = !renderedMyHandKeys.has(key);
         const isQueued = queuedCardKeys.has(key);
-        const inBest = bestKeys.has(`${card.type}-${card.value}`);
+        const inBest = bestKeys.has(key);
         
         if (isNew && !isQueued && state.phase === 'preflop') {
           // Queue card entry animation for new hand cards in preflop
           const slot = document.createElement('div');
           slot.className = 'poke-slot';
           slot.textContent = '?';
+          slot.dataset.cardKey = key; // Set cardKey on placeholder too
           cardsEl.appendChild(slot);
           queueCardEntry(card, cardsEl, i, true);
           queuedCardKeys.add(key);
+          renderedMyHandKeys.add(key);
+        } else if (isQueued) {
+          // Card is queued for animation, recreate placeholder
+          const slot = document.createElement('div');
+          slot.className = 'poke-slot';
+          slot.textContent = '?';
+          slot.dataset.cardKey = key;
+          cardsEl.appendChild(slot);
         } else {
           // Render immediately for existing cards or other phases
           const el = makeMonEl(card, inBest, false, 0);
           el.dataset.cardKey = key;
           cardsEl.appendChild(el);
-        }
-        renderedMyHandKeys.add(key);
-      });
-    } else {
-      // Just update in-best status without re-rendering
-      Array.from(cardsEl.children).forEach((el, i) => {
-        if (i < me.hand.length) {
-          const card = me.hand[i];
-          const inBest = bestKeys.has(`${card.type}-${card.value}`);
-          if (inBest) {
-            el.classList.add('in-best');
-          } else {
-            el.classList.remove('in-best');
-          }
+          renderedMyHandKeys.add(key);
         }
       });
     }
+    
+    // Always update in-best status for all hand cards
+    Array.from(cardsEl.children).forEach((el, i) => {
+      if (el.classList.contains('poke-mon') && i < me.hand.length) {
+        const card = me.hand[i];
+        const key = `${card.type}-${card.id}`;
+        const inBest = bestKeys.has(key);
+        if (inBest) {
+          el.classList.add('in-best');
+        } else {
+          el.classList.remove('in-best');
+        }
+      }
+    });
   }
 
   // ─── Action panel ─────────────────────────────────────────────────────────────
@@ -1191,42 +1247,51 @@
     overlayBox.classList.add('showdown-epic-box');
 
     const winners = state.winners || [];
-    const w       = winners[0];
-    if (!w) return;
+    if (!winners.length) return;
 
     showdownTitle.innerHTML = `<span class="showdown-victory-title">${
-      winners.length > 1 ? t('draw') : t('victory', w.name)
+      winners.length > 1 ? t('draw') : t('victory', winners[0].name)
     }</span>`;
 
+    // Check if all opponents folded (only one player didn't fold)
+    const activePlayers = state.players.filter(p => !p.folded && !p.spectator);
+    const allOpponentsFolded = activePlayers.length === 1;
+
     let html = '';
-    if (w.bestHand) {
-      const bestFiveKeys = new Set((w.bestHand.bestFive || []).map(c => `${c.type}-${c.value}`));
+    
+    // Display all winners (for ties, show all players with same strength)
+    winners.forEach((w, idx) => {
+      if (allOpponentsFolded || !w.bestHand) {
+        // Simple display when all opponents folded - no need to show cards or strength
+        html += `<div class="showdown-winner">
+          <div class="showdown-winner-name">🥇 ${escHtml(w.name)}</div>
+          <div class="showdown-rank-label">${t('allFolded')}</div>
+        </div>`;
+      } else {
+        // Full display with cards and strength when there was actual competition
+        const bestFiveKeys = new Set((w.bestHand.bestFive || []).map(c => `${c.type}-${c.value}`));
 
-      // All 7 cards split into hand + community
-      const handCards      = (w.hand || []);
-      const communityCards = (state.community || []);
+        // All 7 cards split into hand + community
+        const handCards      = (w.hand || []);
+        const communityCards = (state.community || []);
 
-      html += `<div class="showdown-winner">
-        <div class="showdown-winner-name">🥇 ${escHtml(w.name)}</div>
-        <div class="showdown-rank-name">${escHtml(w.bestHand.rankLabel)}</div>
-        <div class="showdown-power">⚔️ ${(w.bestHand.totalPower * 100).toLocaleString()}</div>
+        html += `<div class="showdown-winner${winners.length > 1 ? ' showdown-winner-tied' : ''}">
+          <div class="showdown-winner-name">🥇 ${escHtml(w.name)}</div>
+          <div class="showdown-rank-name">${escHtml(w.bestHand.rankLabel)}</div>
+          <div class="showdown-power">⚔️ ${(w.bestHand.totalPower * 100).toLocaleString()}</div>
 
-        <div class="showdown-group-label">${t('handLabel')}</div>
-        <div class="showdown-mons-epic">
-          ${handCards.map((c, i) => bigMonHtml(c, bestFiveKeys.has(`${c.type}-${c.value}`), i)).join('')}
-        </div>
+          <div class="showdown-group-label">${t('handLabel')}</div>
+          <div class="showdown-mons-epic">
+            ${handCards.map((c, i) => bigMonHtml(c, bestFiveKeys.has(`${c.type}-${c.value}`), i)).join('')}
+          </div>
 
-        <div class="showdown-group-label">${t('communityLabel')}</div>
-        <div class="showdown-mons-epic showdown-community-mons">
-          ${communityCards.map((c, i) => bigMonHtml(c, bestFiveKeys.has(`${c.type}-${c.value}`), i + handCards.length)).join('')}
-        </div>
-      </div>`;
-    } else {
-      html += `<div class="showdown-winner">
-        <div class="showdown-winner-name">🥇 ${escHtml(w.name)}</div>
-        <div class="showdown-rank-label">${t('allFolded')}</div>
-      </div>`;
-    }
+          <div class="showdown-group-label">${t('communityLabel')}</div>
+          <div class="showdown-mons-epic showdown-community-mons">
+            ${communityCards.map((c, i) => bigMonHtml(c, bestFiveKeys.has(`${c.type}-${c.value}`), i + handCards.length)).join('')}
+          </div>
+        </div>`;
+      }
+    });
 
     const others = state.players.filter(p => !winners.find(ww => ww.id === p.id) && p.hand);
 
@@ -1244,13 +1309,27 @@
         const isWinner = winnerIds.has(r.id);
         const deltaStr = (r.delta >= 0 ? '+' : '') + r.delta;
         const deltaClass = r.delta > 0 ? 'delta-pos' : r.delta < 0 ? 'delta-neg' : 'delta-zero';
-        const powerStr = r.bestHand && r.bestHand.totalPower != null
-          ? Math.round(r.bestHand.totalPower * 100).toLocaleString()
-          : '-';
-        const rankStr = r.bestHand
-          ? ` · ${escHtml(r.bestHand.rankLabel)} ⚡${powerStr}`
-          : r.folded ? ` · (${t('folded')})` : '';
-        html += `<div class="round-result-row${isWinner ? ' is-winner' : ''}">
+        
+        // Prioritize showing folded status
+        let rankStr = '';
+        let foldedClass = '';
+        
+        if (r.folded) {
+          // Always show folded status for folded players
+          rankStr = ` · 🏃 ${t('folded')}`;
+          foldedClass = ' folded-player';
+        } else if (allOpponentsFolded) {
+          // Winner when all opponents folded - no rank/power needed
+          rankStr = '';
+        } else if (r.bestHand) {
+          // Normal display with rank and power for active players
+          const powerStr = r.bestHand.totalPower != null
+            ? Math.round(r.bestHand.totalPower * 100).toLocaleString()
+            : '-';
+          rankStr = ` · ${escHtml(r.bestHand.rankLabel)} ⚡${powerStr}`;
+        }
+        
+        html += `<div class="round-result-row${isWinner ? ' is-winner' : ''}${foldedClass}">
           <span class="rr-place">${placeStr}</span>
           <span class="rr-name">${r.isBot ? '🤖 ' : ''}${escHtml(r.name)}${isWinner ? ' 🏆' : ''}${rankStr}</span>
           <span class="rr-delta ${deltaClass}">${deltaStr}</span>
@@ -1283,8 +1362,8 @@
     if (overlayBox) overlayBox.classList.remove('showdown-epic-box');
     showdownOverlay.querySelectorAll('.sparkle').forEach(s => s.remove());
     clearInterval(countdownTimer);
-    renderedCommunityKeys.clear();
-    renderedMyHandKeys.clear();
+    // Don't clear tracking sets here - they should only be cleared when DOM is cleared
+    // renderedCommunityKeys and renderedMyHandKeys are cleared in their respective render functions
   }
 
   // ─── Final Champion Screen ─────────────────────────────────────────────────
@@ -1569,9 +1648,18 @@
           stage.innerHTML = '';
           particlesContainer.innerHTML = '';
           
-          // Add card to actual target container
-          const finalCard = makeMonEl(card, false, false, 0);
+          // Calculate if this card is in best hand
+          const me = gameState?.players.find(p => p.id === myId);
+          const totalCards = (me?.hand?.length || 0) + (gameState?.community?.length || 0);
+          const shouldHighlight = totalCards >= 5;
+          const bestKeys = shouldHighlight && me?.bestHand?.bestFive
+            ? new Set(me.bestHand.bestFive.map(c => `${c.type}-${c.id}`))
+            : new Set();
           const key = `${card.type}-${card.id}`;
+          const inBest = bestKeys.has(key);
+          
+          // Add card to actual target container
+          const finalCard = makeMonEl(card, inBest, false, 0);
           finalCard.dataset.cardKey = key;
           
           if (targetContainer.children[targetIndex]) {
