@@ -35,7 +35,9 @@
       myPower:        '战斗力',
       folded:         '撤退',
       allIn:          '全力出击',
-      dealer:         '庄',
+      dealer:         '道馆主',
+      smallBlind:     '挑战者',
+      bigBlind:       '守关者',
       switchLang:     'English',
       phaseLabels: {
         waiting:  '等待集结',
@@ -88,7 +90,9 @@
       myPower:        'Power',
       folded:         'Fled',
       allIn:          'All-Out',
-      dealer:         'D',
+      dealer:         'Gym Leader',
+      smallBlind:     'Challenger',
+      bigBlind:       'Gatekeeper',
       switchLang:     '中文',
       phaseLabels: {
         waiting:  'Gathering',
@@ -373,23 +377,34 @@
   function renderOpponents(state) {
     const area = $('opponents-area');
     area.innerHTML = '';
+    const n = state.players.length;
+    
     state.players.forEach((p, idx) => {
-      if (p.id === myId) return;
+      const isMe = p.id === myId;
       const isDealer = idx === state.dealerIdx;
       const isActive = state.players[state.turnIndex]?.id === p.id;
+      
+      // Calculate small blind and big blind positions
+      const sbIdx = n > 1 ? (state.dealerIdx + 1) % n : -1;
+      const bbIdx = n > 2 ? (state.dealerIdx + 2) % n : -1;
+      const isSmallBlind = idx === sbIdx && state.phase !== 'waiting';
+      const isBigBlind = idx === bbIdx && state.phase !== 'waiting';
 
       let statusHtml = '';
-      if (p.folded)     statusHtml = `<span class="opp-status folded">${t('folded')}</span>`;
+      // Position indicators take priority, then status
+      if (isDealer) statusHtml = `<span class="opp-status dealer">${t('dealer')}</span>`;
+      else if (isSmallBlind) statusHtml = `<span class="opp-status small-blind">${t('smallBlind')}</span>`;
+      else if (isBigBlind) statusHtml = `<span class="opp-status big-blind">${t('bigBlind')}</span>`;
+      else if (p.folded) statusHtml = `<span class="opp-status folded">${t('folded')}</span>`;
       else if (p.allIn) statusHtml = `<span class="opp-status allin">${t('allIn')}</span>`;
-      else if (isDealer) statusHtml = `<span class="opp-status dealer">${t('dealer')}</span>`;
 
       const slot = document.createElement('div');
       slot.className = `opponent-slot ${p.folded ? 'folded' : ''} ${isActive ? 'is-turn' : ''}`;
       if (p.isBot) slot.classList.add('is-bot');
+      if (isMe) slot.classList.add('is-me');
 
-      const cardsHtml = p.hand && p.hand.length
-        ? `<div class="opp-back-cards">${p.hand.map(c => miniMonHtml(c)).join('')}</div>`
-        : `<div class="opp-back-cards">${'<div class="opp-sprite-back">🔮</div>'.repeat(p.handCount || 2)}</div>`;
+      // 不显示卡片占位符
+      const cardsHtml = '';
 
       const betHtml = p.bet > 0
         ? `<div class="opp-bet">${t('battleCost')}: ${p.bet}</div>` : '';
@@ -397,7 +412,7 @@
       slot.innerHTML = `
         ${cardsHtml}
         <div class="opp-info">
-          <div class="opp-name">${p.isBot ? '🤖 ' : ''}${escHtml(p.name)} ${statusHtml}</div>
+          <div class="opp-name">${p.isBot ? '🤖 ' : ''}${escHtml(p.name)}${isMe ? ' 👤' : ''}${statusHtml}</div>
           <div class="opp-chips">${p.chips} ${t('coins')}</div>
           ${betHtml}
           ${p.bestHand ? `<div style="font-size:10px;color:#aaa">${escHtml(p.bestHand.rankLabel)}</div>` : ''}

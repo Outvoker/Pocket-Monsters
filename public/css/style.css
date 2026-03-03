@@ -889,6 +889,14 @@ input[type="text"]:focus, input[type="number"]:focus {
   animation: pulse-gold 1.5s infinite;
 }
 .opponent-slot.folded { opacity: .4; }
+.opponent-slot.is-me {
+  border-color: rgba(41,182,246,.5);
+  background: rgba(41,182,246,.08);
+}
+.opponent-slot.is-me.is-turn {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(255,215,0,.5);
+}
 
 @keyframes pulse-gold {
   0%,100% { box-shadow: 0 0 8px rgba(255,215,0,.3); }
@@ -911,19 +919,41 @@ input[type="text"]:focus, input[type="number"]:focus {
   );
   border: 1px solid rgba(255,255,255,.15);
 }
-.opp-info { flex: 1; }
-.opp-name { font-size: 14px; font-weight: 700; color: #fff; }
+.opp-pokeball {
+  width: 28px;
+  height: 28px;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.3));
+}
+.opp-info { flex: 1; min-width: 0; }
+.opp-name { 
+  font-size: 14px; 
+  font-weight: 700; 
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
 .opp-chips { font-size: 13px; color: var(--gold); }
 .opp-bet   { font-size: 12px; color: #aaa; }
 .opp-status {
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 3px;
   font-weight: 700;
+  white-space: nowrap;
+  display: inline-block;
+  line-height: 1;
 }
 .opp-status.folded  { background: rgba(255,57,57,.2);  color: #ff5d5d; }
 .opp-status.allin   { background: rgba(142,36,170,.3); color: #ce93d8; }
 .opp-status.dealer  { background: rgba(255,215,0,.2);  color: var(--gold); }
+.opp-status.small-blind { background: rgba(41,182,246,.2); color: #64b5f6; }
+.opp-status.big-blind { background: rgba(255,107,53,.2); color: #ff8a65; }
 
 /* ─── Action panel ────────────────────────────────────────────────────────── */
 .action-panel {
@@ -1766,8 +1796,35 @@ input[type="text"]:focus, input[type="number"]:focus {
   .game-screen { overflow: hidden; }
   .game-layout  { grid-template-rows: auto minmax(0,1fr) auto; height: 0; flex: 1; }
 
-  .opponents-area { padding: 6px 8px; gap: 6px; flex-wrap: nowrap; overflow-x: auto; }
-  .opponent-slot  { min-width: 130px; padding: 6px 8px; }
+  .opponents-area { 
+    padding: 4px 6px; 
+    gap: 4px; 
+    flex-wrap: wrap; 
+    overflow-x: visible; 
+    justify-content: flex-start;
+    max-height: 140px;
+    overflow-y: hidden;
+  }
+  .opponent-slot  { 
+    flex: 0 0 auto;
+    width: calc(25% - 3px);
+    min-width: 80px;
+    max-width: 120px;
+    padding: 4px 5px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .opp-back-cards { 
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .opp-card-back { width: 20px; height: 28px; }
+  .opp-info { width: 100%; }
+  .opp-name { font-size: 10px; gap: 2px; line-height: 1.1; }
+  .opp-chips { font-size: 10px; }
+  .opp-bet { font-size: 9px; }
+  .opp-status { font-size: 7px; padding: 1px 2px; }
 
   .table-area { padding: 4px; }
   .battle-arena { border-radius: 14px; }

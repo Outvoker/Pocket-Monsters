@@ -407,7 +407,11 @@ function autoRevealBoard(room) {
   if (room.community.length < 5) steps.push({ phase: GL.PHASES.RIVER, limit: 5 });
 
   room._autoRevealing = true;   // suppress bot scheduling while we reveal
-  let delay = 800;
+  
+  const initialDelay = 2000;  // 首次发牌前等待2秒
+  const cardInterval = 3000;  // 每张牌之间间隔3秒
+  
+  let delay = initialDelay;
   for (const step of steps) {
     setTimeout(() => {
       if (room._endGameCalled) return;
@@ -415,7 +419,7 @@ function autoRevealBoard(room) {
       while (room.community.length < step.limit) room.community.push(dealCard(room));
       emitGameState(room);
     }, delay);
-    delay += 1600;
+    delay += cardInterval;
   }
   setTimeout(() => {
     room._autoRevealing = false;
