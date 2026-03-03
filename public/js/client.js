@@ -189,6 +189,13 @@
   // ─── Action log feed ───────────────────────────────────────────────────────────────
   const ACTION_ICON  = { fold: '🏳️', check: '💪', call: '⚔️', raise: '⬆️', allin: '💥' };
   const ACTION_COLOR = { fold: '#ef5350', check: '#78909c', call: '#29b6f6', raise: '#ffca28', allin: '#ff6e40' };
+  const ACTION_PARTICLES = { 
+    fold: ['💨', '🏳️', '💔', '😰', '👋'],
+    check: ['💪', '👀', '🤔', '⏸️', '✋'],
+    call: ['⚔️', '💥', '🔥', '⚡', '💢'],
+    raise: ['⬆️', '💰', '✨', '🚀', '💎'],
+    allin: ['💥', '🔥', '⚡', '💣', '💫', '🌟', '✨', '💢']
+  };
 
   const actionFeed = $('action-log-feed');
   function showActionLog({ name, isBot, action, amount, labels }) {
@@ -217,6 +224,102 @@
       el.classList.add('al-hiding');
       el.addEventListener('transitionend', () => el.remove(), { once: true });
     }, 4000);
+
+    // Show epic action announcement only for raise and allin
+    if (action === 'raise' || action === 'allin') {
+      showActionAnnouncement({ name, isBot, action, amount, labels });
+    }
+  }
+
+  // ─── Epic Action Announcement ──────────────────────────────────────────────────
+  let announcementTimeout = null;
+  function showActionAnnouncement({ name, isBot, action, amount, labels }) {
+    const announcement = $('action-announcement');
+    if (!announcement) return;
+
+    // Clear any existing announcement
+    if (announcementTimeout) {
+      clearTimeout(announcementTimeout);
+      announcement.classList.add('hidden');
+    }
+
+    const zhLabel = (labels[action] || {}).zh || action;
+    const enLabel = (labels[action] || {}).en || action;
+    const label   = lang === 'zh' ? zhLabel : enLabel;
+
+    // Set player name
+    const playerEl = announcement.querySelector('.action-announcement-player');
+    playerEl.textContent = (isBot ? '🤖 ' : '') + name;
+
+    // Set action text
+    const textEl = announcement.querySelector('.action-announcement-text');
+    textEl.textContent = label;
+
+    // Set amount (if applicable)
+    const amountEl = announcement.querySelector('.action-announcement-amount');
+    if (amount > 0) {
+      amountEl.textContent = `${amount} ${t('coins')}`;
+      amountEl.style.display = 'block';
+    } else {
+      amountEl.style.display = 'none';
+    }
+
+    // Set action-specific class
+    announcement.className = 'action-announcement action-' + action;
+
+    // Spawn particles
+    spawnActionParticles(announcement, action);
+
+    // Show announcement
+    announcement.classList.remove('hidden');
+
+    // Auto-hide after 2 seconds
+    announcementTimeout = setTimeout(() => {
+      announcement.classList.add('hidden');
+      // Clean up particles
+      const particlesContainer = announcement.querySelector('.action-announcement-particles');
+      if (particlesContainer) particlesContainer.innerHTML = '';
+    }, 2000);
+  }
+
+  function spawnActionParticles(container, action) {
+    const particlesContainer = container.querySelector('.action-announcement-particles');
+    if (!particlesContainer) return;
+
+    // Clear existing particles
+    particlesContainer.innerHTML = '';
+
+    const particles = ACTION_PARTICLES[action] || ['✨'];
+    const count = action === 'allin' ? 20 : 12;
+
+    for (let i = 0; i < count; i++) {
+      const particle = document.createElement('div');
+      particle.className = 'action-announcement-particle';
+      
+      // Random position
+      const x = Math.random() * 100;
+      const y = Math.random() * 100;
+      
+      // Random trajectory
+      const tx = (Math.random() - 0.5) * 200 + 'px';
+      const ty = -(Math.random() * 150 + 50) + 'px';
+      const rotate = (Math.random() * 720 - 360) + 'deg';
+      
+      particle.style.cssText = `
+        left: ${x}%;
+        top: ${y}%;
+        --tx: ${tx};
+        --ty: ${ty};
+        --rotate: ${rotate};
+        animation-delay: ${i * 50}ms;
+      `;
+      
+      particle.textContent = particles[i % particles.length];
+      particlesContainer.appendChild(particle);
+      
+      // Remove after animation
+      particle.addEventListener('animationend', () => particle.remove());
+    }
   }
   // ─── Toast ──────────────────────────────────────────────────────────────────
   const toastEl = $('toast');

@@ -146,15 +146,39 @@ function botDecide(room, bot) {
   
   // Very strong hand (rank 7-9: straight flush, four of a kind, royal)
   if (strength > 0.75 || handRank >= 7) {
-    if (r < 0.02) return { action: GL.ACTIONS.FOLD }; // rare trap fold
+    // Almost never fold strong hands - only 0.5% trap fold
+    if (r < 0.005) return { action: GL.ACTIONS.FOLD };
     
-    // Aggressive raising with strong hands, but respect raise limit
-    if (canRaise && r < 0.80) {
+    // Very aggressive raising with strong hands - 90% raise rate
+    if (canRaise && r < 0.90) {
       const minR = room.currentBet + bb;
       const maxR = bot.bet + bot.chips;
       if (minR < maxR) {
-        // Vary raise size: 2-4x big blind or 50-80% pot
-        const potRaise = Math.floor(room.pot * (0.5 + Math.random() * 0.3));
+        // Larger raise sizes: 3-6x big blind or 60-120% pot
+        const potRaise = Math.floor(room.pot * (0.6 + Math.random() * 0.6));
+        const bbRaise = bb * (3 + Math.floor(Math.random() * 4));
+        const raiseAmt = Math.max(minR, Math.min(potRaise, bbRaise));
+        const amt = Math.min(raiseAmt, maxR);
+        return { action: GL.ACTIONS.RAISE, amount: amt };
+      }
+    }
+    
+    // Always call with strong hands, even large bets
+    if (toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
+    return { action: GL.ACTIONS.ALLIN };
+  }
+
+  // Strong hand (rank 5-6: flush, full house, or good pairs/high cards)
+  if (strength > 0.55) {
+    // Rarely fold strong hands - only 2% fold rate
+    if (r < 0.02) return { action: GL.ACTIONS.FOLD };
+    
+    // More aggressive raising - 70% raise rate
+    if (canRaise && r < 0.70) {
+      const minR = room.currentBet + bb;
+      const maxR = bot.bet + bot.chips;
+      if (minR < maxR) {
+        const potRaise = Math.floor(room.pot * (0.4 + Math.random() * 0.4));
         const bbRaise = bb * (2 + Math.floor(Math.random() * 3));
         const raiseAmt = Math.max(minR, Math.min(potRaise, bbRaise));
         const amt = Math.min(raiseAmt, maxR);
@@ -162,84 +186,67 @@ function botDecide(room, bot) {
       }
     }
     
-    if (toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
-    return { action: GL.ACTIONS.ALLIN };
-  }
-
-  // Strong hand (rank 5-6: flush, full house, or good pairs/high cards)
-  if (strength > 0.55) {
-    if (r < 0.05) return { action: GL.ACTIONS.FOLD }; // occasional fold
-    
-    // Raise with strong hands, but less aggressively and respect raise limit
-    if (canRaise && r < 0.55) {
-      const minR = room.currentBet + bb;
-      const maxR = bot.bet + bot.chips;
-      if (minR < maxR) {
-        const potRaise = Math.floor(room.pot * (0.3 + Math.random() * 0.3));
-        const bbRaise = bb * (2 + Math.floor(Math.random() * 2));
-        const raiseAmt = Math.max(minR, Math.min(potRaise, bbRaise));
-        const amt = Math.min(raiseAmt, maxR);
-        return { action: GL.ACTIONS.RAISE, amount: amt };
-      }
-    }
-    
-    if (toCall <= bot.chips * 0.3) return { action: GL.ACTIONS.CALL };
-    if (r < 0.7 && toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
+    // Much more willing to call large bets - up to 60% of chips
+    if (toCall <= bot.chips * 0.6) return { action: GL.ACTIONS.CALL };
+    // 85% chance to call even larger bets
+    if (r < 0.85 && toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
     return { action: GL.ACTIONS.FOLD };
   }
 
   // Medium hand (rank 3-4: three of a kind, straight, or decent cards)
   if (strength > 0.35) {
     if (toCall === 0) {
-      // Post-flop: bet more aggressively with medium hands instead of always checking
-      if (isPostflop && canRaise && r < 0.35) {
+      // Post-flop: bet more aggressively - 45% raise rate
+      if (isPostflop && canRaise && r < 0.45) {
         const minR = bb;
         const maxR = bot.bet + bot.chips;
         if (minR < maxR) {
-          const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), maxR);
+          const amt = Math.min(bb * (1 + Math.floor(Math.random() * 3)), maxR);
           return { action: GL.ACTIONS.RAISE, amount: amt };
         }
       }
-      // Pre-flop: occasional bluff raise
-      if (isPreflop && canRaise && r < 0.15) {
+      // Pre-flop: more bluff raises - 25% rate
+      if (isPreflop && canRaise && r < 0.25) {
         const minR = bb;
         const maxR = bot.bet + bot.chips;
         if (minR < maxR) {
-          const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), maxR);
+          const amt = Math.min(bb * (1 + Math.floor(Math.random() * 3)), maxR);
           return { action: GL.ACTIONS.RAISE, amount: amt };
         }
       }
       return { action: GL.ACTIONS.CHECK };
     }
     
-    // Call if pot odds are good
-    if (potOdds < strength * 0.8 && toCall <= bot.chips * 0.2) {
+    // More willing to call - up to 35% of chips
+    if (toCall <= bot.chips * 0.35) {
       return { action: GL.ACTIONS.CALL };
     }
     
-    if (r < 0.35) return { action: GL.ACTIONS.FOLD };
-    if (toCall <= bot.chips * 0.15) return { action: GL.ACTIONS.CALL };
+    // Better pot odds calculation - only fold 20% of the time
+    if (r < 0.20) return { action: GL.ACTIONS.FOLD };
+    if (toCall <= bot.chips * 0.5) return { action: GL.ACTIONS.CALL };
     return { action: GL.ACTIONS.FOLD };
   }
 
   // Weak hand
   if (toCall === 0) {
-    // Post-flop: occasionally bet with weak hands (bluff)
-    if (isPostflop && canRaise && r < 0.12 && bot.chips > bb * 5) {
+    // Post-flop: more bluffing - 20% rate
+    if (isPostflop && canRaise && r < 0.20 && bot.chips > bb * 5) {
       const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), bot.chips);
       return { action: GL.ACTIONS.RAISE, amount: amt };
     }
-    // Pre-flop: rare bluff
-    if (isPreflop && canRaise && r < 0.05 && bot.chips > bb * 5) {
+    // Pre-flop: more bluffing - 10% rate
+    if (isPreflop && canRaise && r < 0.10 && bot.chips > bb * 5) {
       const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), bot.chips);
       return { action: GL.ACTIONS.RAISE, amount: amt };
     }
     return { action: GL.ACTIONS.CHECK };
   }
   
-  // Fold most weak hands when facing a bet
-  if (r < 0.80) return { action: GL.ACTIONS.FOLD };
-  if (toCall <= bb && bot.chips > bb * 10) return { action: GL.ACTIONS.CALL }; // cheap call
+  // More willing to call with weak hands - fold only 65% of the time
+  if (r < 0.65) return { action: GL.ACTIONS.FOLD };
+  if (toCall <= bb * 2 && bot.chips > bb * 10) return { action: GL.ACTIONS.CALL }; // call up to 2x BB
+  if (toCall <= bot.chips * 0.15) return { action: GL.ACTIONS.CALL }; // call small bets
   return { action: GL.ACTIONS.FOLD };
 }
 
