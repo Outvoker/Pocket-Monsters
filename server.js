@@ -45,6 +45,7 @@ class RoomState {
     this.roundCount    = 0;       // total rounds played
     this.blindLevel    = 0;       // index into BLIND_LEVELS
     this.finalChampion = null;    // set when only 1 active player remains
+    this.raiseCount    = 0;       // track raises in current betting round
   }
   // Active-round participants (non-spectator)
   activePlayers()    { return this.players.filter(p => !p.folded && !p.allIn && !p.spectator); }
@@ -95,11 +96,14 @@ function makeBotPlayer(name) {
  * - Strong hands: raise aggressively with variable amounts
  * - Medium: call or check, occasional bluffs
  * - Weak: fold or check
+ * - Prevents infinite raise loops by limiting re-raises
  */
 function botDecide(room, bot) {
   const toCall = Math.max(0, room.currentBet - bot.bet);
   const bb = room.bigBlind;
   const potOdds = toCall > 0 ? toCall / (room.pot + toCall) : 0;
+  const isPreflop = room.community.length === 0;
+  const isPostflop = room.community.length >= 3;
 
   // Estimate hand strength 0..1 with better evaluation
   let strength = 0.35;
@@ -136,18 +140,22 @@ function botDecide(room, bot) {
   const r = Math.random();
   const chipRatio = bot.chips / (room.pot + bot.chips);
   
+  // Limit raises to prevent infinite loops: max 3-4 raises per round
+  const maxRaises = isPreflop ? 3 : 4;
+  const canRaise = room.raiseCount < maxRaises;
+  
   // Very strong hand (rank 7-9: straight flush, four of a kind, royal)
   if (strength > 0.75 || handRank >= 7) {
     if (r < 0.02) return { action: GL.ACTIONS.FOLD }; // rare trap fold
     
-    // Aggressive raising with strong hands
-    if (r < 0.85) {
+    // Aggressive raising with strong hands, but respect raise limit
+    if (canRaise && r < 0.80) {
       const minR = room.currentBet + bb;
       const maxR = bot.bet + bot.chips;
       if (minR < maxR) {
-        // Vary raise size: 2-5x big blind or 50-100% pot
-        const potRaise = Math.floor(room.pot * (0.5 + Math.random() * 0.5));
-        const bbRaise = bb * (2 + Math.floor(Math.random() * 4));
+        // Vary raise size: 2-4x big blind or 50-80% pot
+        const potRaise = Math.floor(room.pot * (0.5 + Math.random() * 0.3));
+        const bbRaise = bb * (2 + Math.floor(Math.random() * 3));
         const raiseAmt = Math.max(minR, Math.min(potRaise, bbRaise));
         const amt = Math.min(raiseAmt, maxR);
         return { action: GL.ACTIONS.RAISE, amount: amt };
@@ -162,13 +170,13 @@ function botDecide(room, bot) {
   if (strength > 0.55) {
     if (r < 0.05) return { action: GL.ACTIONS.FOLD }; // occasional fold
     
-    // Raise more often with strong hands
-    if (r < 0.70) {
+    // Raise with strong hands, but less aggressively and respect raise limit
+    if (canRaise && r < 0.55) {
       const minR = room.currentBet + bb;
       const maxR = bot.bet + bot.chips;
       if (minR < maxR) {
-        const potRaise = Math.floor(room.pot * (0.4 + Math.random() * 0.4));
-        const bbRaise = bb * (2 + Math.floor(Math.random() * 3));
+        const potRaise = Math.floor(room.pot * (0.3 + Math.random() * 0.3));
+        const bbRaise = bb * (2 + Math.floor(Math.random() * 2));
         const raiseAmt = Math.max(minR, Math.min(potRaise, bbRaise));
         const amt = Math.min(raiseAmt, maxR);
         return { action: GL.ACTIONS.RAISE, amount: amt };
@@ -183,8 +191,17 @@ function botDecide(room, bot) {
   // Medium hand (rank 3-4: three of a kind, straight, or decent cards)
   if (strength > 0.35) {
     if (toCall === 0) {
-      // Occasional bluff raise
-      if (r < 0.20) {
+      // Post-flop: bet more aggressively with medium hands instead of always checking
+      if (isPostflop && canRaise && r < 0.35) {
+        const minR = bb;
+        const maxR = bot.bet + bot.chips;
+        if (minR < maxR) {
+          const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), maxR);
+          return { action: GL.ACTIONS.RAISE, amount: amt };
+        }
+      }
+      // Pre-flop: occasional bluff raise
+      if (isPreflop && canRaise && r < 0.15) {
         const minR = bb;
         const maxR = bot.bet + bot.chips;
         if (minR < maxR) {
@@ -207,8 +224,13 @@ function botDecide(room, bot) {
 
   // Weak hand
   if (toCall === 0) {
-    // Rare bluff
-    if (r < 0.08 && bot.chips > bb * 5) {
+    // Post-flop: occasionally bet with weak hands (bluff)
+    if (isPostflop && canRaise && r < 0.12 && bot.chips > bb * 5) {
+      const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), bot.chips);
+      return { action: GL.ACTIONS.RAISE, amount: amt };
+    }
+    // Pre-flop: rare bluff
+    if (isPreflop && canRaise && r < 0.05 && bot.chips > bb * 5) {
       const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), bot.chips);
       return { action: GL.ACTIONS.RAISE, amount: amt };
     }
@@ -253,6 +275,7 @@ function executeBotAction(room, bot) {
         addBet(room, bot, Math.min(diff, bot.chips));
         room.currentBet = bot.bet;
         logAmount = bot.bet;
+        room.raiseCount++;
         room.needsToAct = new Set(room.activePlayers().filter(p => p.id !== bot.id).map(p => p.id));
       } else {
         room.needsToAct.delete(bot.id);
@@ -266,6 +289,7 @@ function executeBotAction(room, bot) {
       addBet(room, bot, all);
       if (newTotal > room.currentBet) {
         room.currentBet = newTotal;
+        room.raiseCount++;
         room.needsToAct = new Set(room.activePlayers().filter(p => p.id !== bot.id).map(p => p.id));
       } else {
         room.needsToAct.delete(bot.id);
@@ -363,6 +387,7 @@ function startGame(room) {
 
 function startBettingRound(room) {
   room.currentBet = 0;
+  room.raiseCount = 0;
   for (const p of room.players) p.bet = 0;
   const rp = room.roundPlayers();
   const n  = rp.length;
@@ -460,6 +485,14 @@ function doShowdown(room) {
   if (room.phase === GL.PHASES.SHOWDOWN) return;  // guard against duplicate calls
   room.phase = GL.PHASES.SHOWDOWN;
   const nf = room.nonFoldedPlayers();
+  
+  // If only one player remains (everyone else folded), no showdown needed
+  if (nf.length === 1) {
+    room.tournamentBracket = [];
+    endGame(room, nf);
+    return;
+  }
+  
   for (const p of nf) p.bestHand = GL.evaluateBestHand([...p.hand, ...room.community]);
   nf.sort((a,b) => GL.compareHandResult(b.bestHand, a.bestHand));
   const topPower = nf[0].bestHand.totalPower;
@@ -712,6 +745,7 @@ io.on('connection', socket => {
         addBet(room, player, logAmount);
         room.currentBet = player.bet;
         logAmount = player.bet;  // show total bet
+        room.raiseCount++;
         room.needsToAct = new Set(room.activePlayers().filter(p => p.id !== player.id).map(p => p.id));
         break;
       }
@@ -722,6 +756,7 @@ io.on('connection', socket => {
         addBet(room, player, all);
         if (newTotal > room.currentBet) {
           room.currentBet = newTotal;
+          room.raiseCount++;
           room.needsToAct = new Set(room.activePlayers().filter(p => p.id !== player.id).map(p => p.id));
         } else {
           room.needsToAct.delete(player.id);

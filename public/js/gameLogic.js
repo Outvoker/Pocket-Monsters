@@ -104,7 +104,7 @@ const HAND_RANKS = [
   { rank: 8, key: 'straight_flush',  label: '同系进化链',  desc: '同系连续进化',    power: 800 },
   { rank: 7, key: 'four_of_a_kind',  label: '四天王',  desc: '四只同级精灵',      power: 600 },
   { rank: 6, key: 'full_house',      label: '精英小队',  desc: '三只+两只同级', power: 450 },
-  { rank: 5, key: 'flush',           label: '属性一致',  desc: '五只同系精灵',        power: 350 },
+  { rank: 5, key: 'flush',           label: '同系军团',  desc: '五只同系精灵',        power: 350 },
   { rank: 4, key: 'straight',        label: '完整进化链',  desc: '五只连续等级',    power: 250 },
   { rank: 3, key: 'three_of_a_kind', label: '三重奏',  desc: '三只同级精灵',      power: 150 },
   { rank: 2, key: 'two_pair',        label: '双打组合',  desc: '两组搭档',        power: 80  },
