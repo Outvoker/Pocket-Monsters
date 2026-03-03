@@ -1045,6 +1045,11 @@
     
     // Phase 3: Both players attack simultaneously (at 3.5s)
     setTimeout(() => {
+      // Play battle music when attack animation starts
+      const battleSfx = new Audio('/audio/battle.mp3');
+      battleSfx.volume = 0.5;
+      battleSfx.play().catch(e => console.log('Battle SFX play failed:', e));
+      
       p1El.classList.add('tournament-attacking');
       p2El.classList.add('tournament-attacking');
     }, 3500);
@@ -1153,6 +1158,11 @@
   const countdownEl      = $('countdown');
 
   function showShowdown(state) {
+    // Play victory music as one-time sound effect
+    const victorySfx = new Audio('/audio/victory.mp3');
+    victorySfx.volume = 0.5;
+    victorySfx.play().catch(e => console.log('Victory SFX play failed:', e));
+    
     // Calculate total tournament animation time
     const bracket = state.tournamentBracket || [];
     const BATTLE_DURATION = 8000;  // Match server-side duration
