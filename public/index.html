@@ -21,6 +21,8 @@
     </div>
 
     <div class="lobby-card">
+      <button class="btn btn-purple" id="btn-help-lobby" data-i18n="helpManual">📖 精灵图鉴</button>
+      
       <div class="input-row">
         <label data-i18n="trainerName">训练家名称</label>
         <input id="player-name-input" type="text" maxlength="12" placeholder="输入你的名字…" data-i18n-placeholder="namePlaceholder" />
@@ -54,9 +56,9 @@
     <div class="room-info">
       <span data-i18n="arena">擂台</span>: <span id="hdr-room-id"></span>
       &nbsp;|&nbsp; <span id="hdr-phase" style="display:none"></span>
-      &nbsp;|&nbsp; <span data-i18n="prize">奖池</span>:
+      &nbsp;|&nbsp; <span data-i18n="prize">奖励池</span>:
         <span id="hdr-pot" class="gold">0</span>
-        <span data-i18n="coins">金币</span>      &nbsp;|  <span id="hdr-blind-info" class="hdr-blind-info">盲注: 10/20 · 第 0 局</span>    </div>
+        <span data-i18n="coins">金币</span>      &nbsp;|  <span id="hdr-blind-info" class="hdr-blind-info">入场费: 10/20 · 第 0 局</span>    </div>
     <div class="game-header-btns" style="display:flex;gap:8px;align-items:center">
       <button class="btn-lang" id="btn-lang-game">English</button>
       <!-- Help -->
@@ -89,7 +91,7 @@
             <div class="pokeball-btn"></div>
           </div>
           <div id="pot-display" class="pot-display">
-            <span data-i18n="prize">奖池</span>: <strong>0</strong>
+            <span data-i18n="prize">奖励池</span>: <strong>0</strong>
             <span data-i18n="coins">金币</span>
           </div>
           <div id="community-cards" class="community-cards"></div>
@@ -116,15 +118,15 @@
       <!-- Action panel -->
       <div id="action-panel" class="action-panel hidden">
         <div class="call-info">
-          <span data-i18n="battleCost">迎战费</span>:
+          <span data-i18n="battleCost">应战费用</span>:
           <span id="call-amount">0</span>
           <span data-i18n="coins">金币</span>
         </div>
         <div class="action-buttons">
           <button class="btn btn-gray"   id="btn-fold"  data-i18n="fold">撤  退</button>
-          <button class="btn btn-blue"   id="btn-check" data-i18n="check">蓄  力</button>
-          <button class="btn btn-green"  id="btn-call"  data-i18n="call">迎  战</button>
-          <button class="btn btn-purple" id="btn-allin" data-i18n="allin">决一死战</button>
+          <button class="btn btn-blue"   id="btn-check" data-i18n="check">观  望</button>
+          <button class="btn btn-green"  id="btn-call"  data-i18n="call">应  战</button>
+          <button class="btn btn-purple" id="btn-allin" data-i18n="allin">全力以赴</button>
         </div>
         <div class="raise-row">
           <button class="btn btn-red"    id="btn-raise" data-i18n="raise">强  化</button>
@@ -162,7 +164,7 @@
 
 <!-- ── BGM ──────────────────────────────────────────────────────────────────── -->
 <audio id="bgm" loop preload="none">
-  <source src="https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/25.ogg" type="audio/ogg" />
+  <source src="/audio/pikachu.ogg" type="audio/ogg" />
 </audio>
 
 <!-- ── SHOWDOWN OVERLAY ──────────────────────────────────────────────────────── -->
@@ -190,10 +192,10 @@
 <div id="help-overlay" class="overlay hidden help-overlay">
   <div class="help-box">
     <button class="help-close" id="help-close">✕</button>
-    <h2 class="help-title">📖 游戏手册</h2>
+    <h2 class="help-title">📖 精灵图鉴</h2>
 
     <section class="help-section">
-      <h3 class="help-section-title">🃏 牌型大小（从强到弱）</h3>
+      <h3 class="help-section-title">⚔️ 阵容强度（从强到弱）</h3>
       <div id="help-hands" class="help-hands"></div>
     </section>
 

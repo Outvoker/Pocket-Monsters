@@ -19,15 +19,15 @@
       openArenas:     '🏟️ 开放的擂台',
       noRooms:        '暂无开放擂台…',
       arena:          '擂台',
-      prize:          '奖池',
+      prize:          '奖励池',
       coins:          '金币',
       leave:          '离开',
-      battleCost:     '迎战费',
+      battleCost:     '应战费用',
       fold:           '撤  退',
-      check:          '蓄  力',
-      call:           '迎  战',
+      check:          '观  望',
+      call:           '应  战',
       raise:          '强  化',
-      allin:          '决一死战',
+      allin:          '全力以赴',
       startBattle:    '⚔️ 开始对战！',
       nextRound:      '下一局即将开始',
       waitHost:       '等待房主开始对战…',
@@ -39,10 +39,10 @@
       switchLang:     'English',
       phaseLabels: {
         waiting:  '等待集结',
-        preflop:  '出战选将',
-        flop:     '战场展开',
-        turn:     '激战正酣',
-        river:    '最终决战',
+        preflop:  '初始精灵',
+        flop:     '探索阶段',
+        turn:     '遭遇阶段',
+        river:    '决战阶段',
         showdown: '胜负揭晓',
       },
       battleResult:   '⚔️ 决战结果',
@@ -57,10 +57,10 @@
       spectatorHint:  '你的金币已用尽，正在观战剩余选手的对决！',
       finalChampionTitle: name => `🏆 ${name} 是最终胜者！`,
       finalChampionSub:   '最后的训练家！',
-      blindsNow:      (s, b) => `盲注: ${s}/${b}`,
+      blindsNow:      (s, b) => `入场费: ${s}/${b}`,
       roundLabel:     r => `第 ${r} 局`,
-      handLabel:      '手牌宝可梦',
-      communityLabel: '公共战场',    },
+      handLabel:      '持有精灵',
+      communityLabel: '对战场地',    },
     en: {
       subtitle:       'Assemble your strongest team and battle!',
       trainerName:    'Trainer Name',
@@ -154,6 +154,8 @@
   let countdownTimer  = null;
   // tracks which community card keys are already in the DOM (never re-animate them)
   const renderedCommunityKeys = new Set();
+  // tracks which hand card keys are already in the DOM (never re-animate them)
+  const renderedMyHandKeys = new Set();
 
   const TYPE_EMOJI  = { fire: '🔥', water: '💧', grass: '🌿', electric: '⚡' };
   const VALUE_LABEL = v =>
@@ -314,21 +316,55 @@
     // On new game start the community will be empty; reset tracking
     if (state.phase === 'preflop' || state.phase === 'waiting') {
       renderedCommunityKeys.clear();
+      el.innerHTML = '';
     }
 
-    el.innerHTML = '';
-    for (let i = 0; i < 5; i++) {
-      if (i < cards.length) {
-        const card  = cards[i];
-        const key   = `${card.type}-${card.id}`;
-        const isNew = !renderedCommunityKeys.has(key);
-        el.appendChild(makeMonEl(card, false, isNew, isNew ? i * 80 : 0));
-        renderedCommunityKeys.add(key);
+    // Get current number of rendered cards
+    const currentCardCount = Array.from(el.children).filter(child => 
+      child.classList.contains('poke-mon')
+    ).length;
+
+    // Only render if the number of cards changed or container is empty
+    if (currentCardCount !== cards.length || el.children.length === 0) {
+      // If we have fewer cards than before or starting fresh, do full render
+      if (currentCardCount > cards.length || el.children.length === 0) {
+        el.innerHTML = '';
+        renderedCommunityKeys.clear();
+        
+        for (let i = 0; i < 5; i++) {
+          if (i < cards.length) {
+            const card  = cards[i];
+            const key   = `${card.type}-${card.id}`;
+            const isNew = !renderedCommunityKeys.has(key);
+            const monEl = makeMonEl(card, false, isNew, isNew ? i * 100 : 0);
+            monEl.dataset.cardKey = key;
+            el.appendChild(monEl);
+            renderedCommunityKeys.add(key);
+          } else {
+            const slot = document.createElement('div');
+            slot.className  = 'poke-slot';
+            slot.textContent = '?';
+            el.appendChild(slot);
+          }
+        }
       } else {
-        const slot = document.createElement('div');
-        slot.className  = 'poke-slot';
-        slot.textContent = '?';
-        el.appendChild(slot);
+        // We have more cards than before - only add the new ones
+        for (let i = currentCardCount; i < cards.length; i++) {
+          const card  = cards[i];
+          const key   = `${card.type}-${card.id}`;
+          const isNew = !renderedCommunityKeys.has(key);
+          const monEl = makeMonEl(card, false, isNew, isNew ? 100 : 0);
+          monEl.dataset.cardKey = key;
+          
+          // Replace the placeholder at position i
+          if (el.children[i] && el.children[i].classList.contains('poke-slot')) {
+            el.replaceChild(monEl, el.children[i]);
+          } else {
+            el.appendChild(monEl);
+          }
+          
+          renderedCommunityKeys.add(key);
+        }
       }
     }
   }
@@ -370,41 +406,62 @@
     });
   }
 
-  // ─── My hand ──────────────────────────────────────────────────────────────────
+  // ─── My hand ────────────────────────────────────────────────────────────────────────
   function renderMyHand(state, me) {
     const cardsEl    = $('my-cards');
     const hudEl      = $('power-hud');
     const hudRankEl  = $('power-hud-rank');
     const hudPwrEl   = $('power-hud-power');
-    cardsEl.innerHTML = '';
+
+    // Reset tracking on new game
+    if (state.phase === 'preflop' || state.phase === 'waiting') {
+      renderedMyHandKeys.clear();
+    }
 
     if (!me || !me.hand || !me.hand.length) {
+      cardsEl.innerHTML = '';
       for (let i = 0; i < 2; i++) {
         const s = document.createElement('div');
         s.className = 'poke-slot'; s.textContent = '?';
         cardsEl.appendChild(s);
       }
       if (hudEl) hudEl.classList.add('hidden');
-      return;
-    }
-
-    // Power HUD when enough community cards
-    if (state.phase !== 'waiting' && state.community.length >= 3) {
-      const best = GL.evaluateBestHand([...me.hand, ...state.community]);
-      if (hudRankEl) hudRankEl.textContent = best.rankLabel;
-      if (hudPwrEl)  hudPwrEl.textContent  = '⚔️ ' + (best.totalPower * 100).toLocaleString();
-      if (hudEl)     hudEl.classList.remove('hidden');
-    } else {
-      if (hudEl) hudEl.classList.add('hidden');
     }
 
     const bestKeys = new Set((me.bestHand?.bestFive || []).map(c => `${c.type}-${c.value}`));
 
-    // My hand is NEVER re-animated (player's own mons are stable)
-    me.hand.forEach(card => {
-      const inBest = bestKeys.has(`${card.type}-${card.value}`);
-      cardsEl.appendChild(makeMonEl(card, inBest, false, 0));
-    });
+    // Only clear and re-render if hand composition changed
+    const currentHandKeys = me.hand.map(c => `${c.type}-${c.id}`).join(',');
+    const existingHandKeys = Array.from(cardsEl.children)
+      .filter(el => el.classList.contains('poke-mon'))
+      .map(el => el.dataset.cardKey)
+      .join(',');
+
+    if (currentHandKeys !== existingHandKeys) {
+      cardsEl.innerHTML = '';
+      me.hand.forEach((card, i) => {
+        const key = `${card.type}-${card.id}`;
+        const isNew = !renderedMyHandKeys.has(key);
+        const inBest = bestKeys.has(`${card.type}-${card.value}`);
+        const el = makeMonEl(card, inBest, isNew, isNew ? i * 50 : 0);
+        el.dataset.cardKey = key;
+        cardsEl.appendChild(el);
+        renderedMyHandKeys.add(key);
+      });
+    } else {
+      // Just update in-best status without re-rendering
+      Array.from(cardsEl.children).forEach((el, i) => {
+        if (i < me.hand.length) {
+          const card = me.hand[i];
+          const inBest = bestKeys.has(`${card.type}-${card.value}`);
+          if (inBest) {
+            el.classList.add('in-best');
+          } else {
+            el.classList.remove('in-best');
+          }
+        }
+      });
+    }
   }
 
   // ─── Action panel ─────────────────────────────────────────────────────────────
@@ -605,6 +662,7 @@
     showdownOverlay.querySelectorAll('.sparkle').forEach(s => s.remove());
     clearInterval(countdownTimer);
     renderedCommunityKeys.clear();
+    renderedMyHandKeys.clear();
   }
 
   // ─── Final Champion Screen ─────────────────────────────────────────────────
@@ -847,8 +905,9 @@
   (function initHelp() {
     const overlay  = document.getElementById('help-overlay');
     const btnHelp  = document.getElementById('btn-help');
+    const btnHelpLobby = document.getElementById('btn-help-lobby');
     const btnClose = document.getElementById('help-close');
-    if (!overlay || !btnHelp) return;
+    if (!overlay) return;
 
     const RANK_LABELS = { 9:'#1', 8:'#2', 7:'#3', 6:'#4', 5:'#5', 4:'#6', 3:'#7', 2:'#8', 1:'#9', 0:'#10' };
 
@@ -881,11 +940,14 @@
       }
     }
 
-    btnHelp.addEventListener('click', () => {
+    function openHelp() {
       buildHelp();
       overlay.classList.remove('hidden');
-    });
-    btnClose.addEventListener('click', () => overlay.classList.add('hidden'));
+    }
+
+    if (btnHelp) btnHelp.addEventListener('click', openHelp);
+    if (btnHelpLobby) btnHelpLobby.addEventListener('click', openHelp);
+    if (btnClose) btnClose.addEventListener('click', () => overlay.classList.add('hidden'));
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
   })();
 

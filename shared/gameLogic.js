@@ -98,18 +98,18 @@ function shuffle(arr) {
 }
 
 // ─── Hand evaluation ─────────────────────────────────────────────────────────
-// Hand rank names (custom Pokemon-themed)
+// Hand rank names (Pokemon-themed)
 const HAND_RANKS = [
-  { rank: 9, key: 'royal_battle',    label: '皇家战队',  desc: '同系最强连击',    power: 900 },
-  { rank: 8, key: 'straight_flush',  label: '同系连击',  desc: '同系连续五张',    power: 800 },
-  { rank: 7, key: 'four_of_a_kind',  label: '四族合璧',  desc: '四张同点数',      power: 600 },
-  { rank: 6, key: 'full_house',      label: '精锐战队',  desc: '三张+两张同点数', power: 450 },
-  { rank: 5, key: 'flush',           label: '系出同源',  desc: '五张同系',        power: 350 },
-  { rank: 4, key: 'straight',        label: '进化之路',  desc: '五张连续点数',    power: 250 },
-  { rank: 3, key: 'three_of_a_kind', label: '三强联合',  desc: '三张同点数',      power: 150 },
-  { rank: 2, key: 'two_pair',        label: '双打联盟',  desc: '两组对子',        power: 80  },
-  { rank: 1, key: 'one_pair',        label: '同伴出击',  desc: '一组对子',        power: 40  },
-  { rank: 0, key: 'high_card',       label: '最强先锋',  desc: '单张最大',        power: 10  },
+  { rank: 9, key: 'royal_battle',    label: '传说阵容',  desc: '同系最强进化链',    power: 900 },
+  { rank: 8, key: 'straight_flush',  label: '同系进化链',  desc: '同系连续进化',    power: 800 },
+  { rank: 7, key: 'four_of_a_kind',  label: '四天王',  desc: '四只同级精灵',      power: 600 },
+  { rank: 6, key: 'full_house',      label: '精英小队',  desc: '三只+两只同级', power: 450 },
+  { rank: 5, key: 'flush',           label: '属性一致',  desc: '五只同系精灵',        power: 350 },
+  { rank: 4, key: 'straight',        label: '完整进化链',  desc: '五只连续等级',    power: 250 },
+  { rank: 3, key: 'three_of_a_kind', label: '三重奏',  desc: '三只同级精灵',      power: 150 },
+  { rank: 2, key: 'two_pair',        label: '双打组合',  desc: '两组搭档',        power: 80  },
+  { rank: 1, key: 'one_pair',        label: '黄金搭档',  desc: '一组搭档',        power: 40  },
+  { rank: 0, key: 'high_card',       label: '王牌精灵',  desc: '单只最强',        power: 10  },
 ];
 
 const RANK_MAP = {};
@@ -255,7 +255,7 @@ const ACTIONS = {
 
 // ─── Sprite URL helper ────────────────────────────────────────────────────────
 function spriteUrl(pokemonId) {
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png`;
+  return `/images/pokemon/${pokemonId}.png`;
 }
 
 // Export for both Node.js and browser

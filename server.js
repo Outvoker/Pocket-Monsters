@@ -89,57 +89,134 @@ function makeBotPlayer(name) {
 }
 
 /**
- * Simple bot AI: returns { action, amount? }
- * - Evaluates hand strength from 0..1
- * - Strong hands: raise/call aggressively
- * - Medium: call or check
+ * Enhanced bot AI: returns { action, amount? }
+ * - Evaluates hand strength more accurately
+ * - Strong hands: raise aggressively with variable amounts
+ * - Medium: call or check, occasional bluffs
  * - Weak: fold or check
  */
 function botDecide(room, bot) {
   const toCall = Math.max(0, room.currentBet - bot.bet);
+  const bb = room.bigBlind;
+  const potOdds = toCall > 0 ? toCall / (room.pot + toCall) : 0;
 
-  // Estimate hand strength 0..1
+  // Estimate hand strength 0..1 with better evaluation
   let strength = 0.35;
+  let handRank = 0;
+  
   if (bot.hand && bot.hand.length >= 2) {
     const allCards = [...bot.hand, ...room.community];
     if (allCards.length >= 5) {
       const result = GL.evaluateBestHand(allCards);
-      strength = result.rank / 9;           // rank 0-9 → 0..1
+      handRank = result.rank;
+      strength = result.rank / 9;
+      // Boost strength based on high cards
+      const highCardBonus = result.highCardBonus / 195;
+      strength = Math.min(1, strength + highCardBonus * 0.15);
     } else {
-      // pre-flop: use average card value as proxy
-      const avg = bot.hand.reduce((s, c) => s + c.value, 0) / bot.hand.length;
-      strength = avg / 13;
+      // Pre-flop: better evaluation based on card quality
+      const values = bot.hand.map(c => c.value).sort((a, b) => b - a);
+      const types = bot.hand.map(c => c.type);
+      const isPair = values[0] === values[1];
+      const isSuited = types[0] === types[1];
+      const highCard = values[0];
+      
+      if (isPair) {
+        strength = 0.5 + (highCard / 13) * 0.35; // pairs are strong
+      } else {
+        const avg = (values[0] + values[1]) / 2;
+        strength = (avg / 13) * 0.6;
+        if (isSuited) strength += 0.1; // suited bonus
+        if (highCard >= 11) strength += 0.15; // face card bonus
+      }
     }
   }
 
   const r = Math.random();
-  const bb = room.bigBlind;
-
-  if (strength > 0.6) {             // strong hand
-    if (r < 0.08) return { action: GL.ACTIONS.FOLD };
-    if (r < 0.50) {
+  const chipRatio = bot.chips / (room.pot + bot.chips);
+  
+  // Very strong hand (rank 7-9: straight flush, four of a kind, royal)
+  if (strength > 0.75 || handRank >= 7) {
+    if (r < 0.02) return { action: GL.ACTIONS.FOLD }; // rare trap fold
+    
+    // Aggressive raising with strong hands
+    if (r < 0.85) {
       const minR = room.currentBet + bb;
       const maxR = bot.bet + bot.chips;
       if (minR < maxR) {
-        const amt = Math.min(minR + Math.floor(Math.random() * bb * 3), maxR);
+        // Vary raise size: 2-5x big blind or 50-100% pot
+        const potRaise = Math.floor(room.pot * (0.5 + Math.random() * 0.5));
+        const bbRaise = bb * (2 + Math.floor(Math.random() * 4));
+        const raiseAmt = Math.max(minR, Math.min(potRaise, bbRaise));
+        const amt = Math.min(raiseAmt, maxR);
         return { action: GL.ACTIONS.RAISE, amount: amt };
       }
     }
+    
     if (toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
     return { action: GL.ACTIONS.ALLIN };
   }
 
-  if (strength > 0.30) {            // medium hand
-    if (toCall === 0) return { action: r < 0.15 ? GL.ACTIONS.RAISE : GL.ACTIONS.CHECK };
-    if (r < 0.30) return { action: GL.ACTIONS.FOLD };
-    if (toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
+  // Strong hand (rank 5-6: flush, full house, or good pairs/high cards)
+  if (strength > 0.55) {
+    if (r < 0.05) return { action: GL.ACTIONS.FOLD }; // occasional fold
+    
+    // Raise more often with strong hands
+    if (r < 0.70) {
+      const minR = room.currentBet + bb;
+      const maxR = bot.bet + bot.chips;
+      if (minR < maxR) {
+        const potRaise = Math.floor(room.pot * (0.4 + Math.random() * 0.4));
+        const bbRaise = bb * (2 + Math.floor(Math.random() * 3));
+        const raiseAmt = Math.max(minR, Math.min(potRaise, bbRaise));
+        const amt = Math.min(raiseAmt, maxR);
+        return { action: GL.ACTIONS.RAISE, amount: amt };
+      }
+    }
+    
+    if (toCall <= bot.chips * 0.3) return { action: GL.ACTIONS.CALL };
+    if (r < 0.7 && toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
     return { action: GL.ACTIONS.FOLD };
   }
 
-  // weak hand
-  if (toCall === 0) return { action: GL.ACTIONS.CHECK };
-  if (r < 0.65) return { action: GL.ACTIONS.FOLD };
-  if (toCall <= bot.chips) return { action: GL.ACTIONS.CALL };
+  // Medium hand (rank 3-4: three of a kind, straight, or decent cards)
+  if (strength > 0.35) {
+    if (toCall === 0) {
+      // Occasional bluff raise
+      if (r < 0.20) {
+        const minR = bb;
+        const maxR = bot.bet + bot.chips;
+        if (minR < maxR) {
+          const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), maxR);
+          return { action: GL.ACTIONS.RAISE, amount: amt };
+        }
+      }
+      return { action: GL.ACTIONS.CHECK };
+    }
+    
+    // Call if pot odds are good
+    if (potOdds < strength * 0.8 && toCall <= bot.chips * 0.2) {
+      return { action: GL.ACTIONS.CALL };
+    }
+    
+    if (r < 0.35) return { action: GL.ACTIONS.FOLD };
+    if (toCall <= bot.chips * 0.15) return { action: GL.ACTIONS.CALL };
+    return { action: GL.ACTIONS.FOLD };
+  }
+
+  // Weak hand
+  if (toCall === 0) {
+    // Rare bluff
+    if (r < 0.08 && bot.chips > bb * 5) {
+      const amt = Math.min(bb * (1 + Math.floor(Math.random() * 2)), bot.chips);
+      return { action: GL.ACTIONS.RAISE, amount: amt };
+    }
+    return { action: GL.ACTIONS.CHECK };
+  }
+  
+  // Fold most weak hands when facing a bet
+  if (r < 0.80) return { action: GL.ACTIONS.FOLD };
+  if (toCall <= bb && bot.chips > bb * 10) return { action: GL.ACTIONS.CALL }; // cheap call
   return { action: GL.ACTIONS.FOLD };
 }
 
@@ -466,10 +543,10 @@ function closeRoomIfBotsOnly(room) {
 function broadcastActionLog(room, player, action, amount) {
   const labels = {
     fold:  { zh: '撤退',     en: 'Folded'   },
-    check: { zh: '蓄力',     en: 'Checked'  },
-    call:  { zh: '跟注',     en: 'Called'   },
-    raise: { zh: '加注',     en: 'Raised'   },
-    allin: { zh: '全力出击', en: 'All-In'   },
+    check: { zh: '观望',     en: 'Checked'  },
+    call:  { zh: '应战',     en: 'Called'   },
+    raise: { zh: '强化',     en: 'Raised'   },
+    allin: { zh: '全力以赴', en: 'All-In'   },
   };
   io.to(room.id).emit('action_log', {
     name:   player.name,
@@ -557,7 +634,7 @@ io.on('connection', socket => {
         room.needsToAct.delete(player.id);
         break;
       case GL.ACTIONS.CHECK:
-        if (toCall > 0) return socket.emit('error', { msg: `需要跟注 ${toCall}，不能过牌` });
+        if (toCall > 0) return socket.emit('error', { msg: `需要应战 ${toCall}，不能观望` });
         room.needsToAct.delete(player.id);
         break;
       case GL.ACTIONS.CALL: {
@@ -567,7 +644,7 @@ io.on('connection', socket => {
         break;
       }
       case GL.ACTIONS.RAISE: {
-        if (!amount || amount <= room.currentBet) return socket.emit('error', { msg: '加注必须大于当前注额' });
+        if (!amount || amount <= room.currentBet) return socket.emit('error', { msg: '强化必须大于当前下注' });
         const diff = amount - player.bet;
         logAmount = Math.min(diff, player.chips);
         addBet(room, player, logAmount);

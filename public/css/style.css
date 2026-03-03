@@ -1,6 +1,70 @@
 /* ─── Reset & base ────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ─── Keyframe Animations ─────────────────────────────────────────────────── */
+@keyframes cardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cardFlip {
+  0% { transform: rotateY(0deg); }
+  50% { transform: rotateY(90deg); }
+  100% { transform: rotateY(0deg); }
+}
+
+@keyframes floatIdle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 8px currentColor); }
+  50% { filter: brightness(1.3) drop-shadow(0 0 15px currentColor); }
+}
+
+@keyframes celebrationBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-20px) scale(1.1); }
+  50% { transform: translateY(-10px) scale(1.05); }
+  75% { transform: translateY(-15px) scale(1.08); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes rotateGlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cardReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotateY(180deg);
+  }
+  60% {
+    transform: scale(1.15) rotateY(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotateY(0deg);
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
 :root {
   --fire:     #FF6B35;
   --water:    #29B6F6;
@@ -581,11 +645,31 @@ input[type="text"]:focus, input[type="number"]:focus {
   align-items: center;
   flex-shrink: 0;
   cursor: default;
+  animation: cardSlideIn 0.5s ease-out backwards;
 }
 
-/* Community mons: 110px wrap */
+/* Stagger animation delays for cards */
+.poke-mon:nth-child(1) { animation-delay: 0.05s; }
+.poke-mon:nth-child(2) { animation-delay: 0.1s; }
+.poke-mon:nth-child(3) { animation-delay: 0.15s; }
+.poke-mon:nth-child(4) { animation-delay: 0.2s; }
+.poke-mon:nth-child(5) { animation-delay: 0.25s; }
+.poke-mon:nth-child(6) { animation-delay: 0.3s; }
+.poke-mon:nth-child(7) { animation-delay: 0.35s; }
+
+/* Community mons: 110px wrap with reveal animation */
+.community-cards .poke-mon {
+  animation: cardReveal 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) backwards;
+}
 .community-cards .poke-mon .poke-mon-sprite-wrap { width: 110px; height: 110px; }
 .community-cards .poke-mon .poke-sprite          { width: 100px; height: 100px; }
+
+/* Community card stagger delays */
+.community-cards .poke-mon:nth-child(1) { animation-delay: 0.1s; }
+.community-cards .poke-mon:nth-child(2) { animation-delay: 0.2s; }
+.community-cards .poke-mon:nth-child(3) { animation-delay: 0.3s; }
+.community-cards .poke-mon:nth-child(4) { animation-delay: 0.4s; }
+.community-cards .poke-mon:nth-child(5) { animation-delay: 0.5s; }
 
 /* My-hand mons: 108px wrap */
 .my-cards .poke-mon .poke-mon-sprite-wrap { width: 108px; height: 108px; }
@@ -598,26 +682,112 @@ input[type="text"]:focus, input[type="number"]:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: filter .2s;
+  transition: all .3s ease;
 }
-.poke-mon-sprite-wrap:hover { filter: brightness(1.2); }
+
+/* Type-based background glow */
+.poke-mon.fire .poke-mon-sprite-wrap {
+  background: radial-gradient(circle, rgba(255,107,53,0.25) 0%, rgba(255,107,53,0.08) 50%, transparent 100%);
+  box-shadow: 0 0 20px rgba(255,107,53,0.4), inset 0 0 30px rgba(255,107,53,0.15);
+}
+.poke-mon.water .poke-mon-sprite-wrap {
+  background: radial-gradient(circle, rgba(41,182,246,0.25) 0%, rgba(41,182,246,0.08) 50%, transparent 100%);
+  box-shadow: 0 0 20px rgba(41,182,246,0.4), inset 0 0 30px rgba(41,182,246,0.15);
+}
+.poke-mon.grass .poke-mon-sprite-wrap {
+  background: radial-gradient(circle, rgba(102,187,106,0.25) 0%, rgba(102,187,106,0.08) 50%, transparent 100%);
+  box-shadow: 0 0 20px rgba(102,187,106,0.4), inset 0 0 30px rgba(102,187,106,0.15);
+}
+.poke-mon.electric .poke-mon-sprite-wrap {
+  background: radial-gradient(circle, rgba(255,214,0,0.25) 0%, rgba(255,214,0,0.08) 50%, transparent 100%);
+  box-shadow: 0 0 20px rgba(255,214,0,0.4), inset 0 0 30px rgba(255,214,0,0.15);
+}
+
+.poke-mon-sprite-wrap:hover {
+  filter: brightness(1.3);
+  transform: scale(1.1) translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+
+/* Floating idle animation for cards */
+.my-cards .poke-mon-sprite-wrap,
+.community-cards .poke-mon-sprite-wrap {
+  animation: floatIdle 3s ease-in-out infinite;
+}
+.my-cards .poke-mon:nth-child(1) .poke-mon-sprite-wrap { animation-delay: 0s; }
+.my-cards .poke-mon:nth-child(2) .poke-mon-sprite-wrap { animation-delay: 0.5s; }
+.my-cards .poke-mon:nth-child(3) .poke-mon-sprite-wrap { animation-delay: 1s; }
+.my-cards .poke-mon:nth-child(4) .poke-mon-sprite-wrap { animation-delay: 1.5s; }
+.my-cards .poke-mon:nth-child(5) .poke-mon-sprite-wrap { animation-delay: 2s; }
+.my-cards .poke-mon:nth-child(6) .poke-mon-sprite-wrap { animation-delay: 2.5s; }
+.my-cards .poke-mon:nth-child(7) .poke-mon-sprite-wrap { animation-delay: 3s; }
+
+.community-cards .poke-mon:nth-child(1) .poke-mon-sprite-wrap { animation-delay: 0.2s; }
+.community-cards .poke-mon:nth-child(2) .poke-mon-sprite-wrap { animation-delay: 0.7s; }
+.community-cards .poke-mon:nth-child(3) .poke-mon-sprite-wrap { animation-delay: 1.2s; }
+.community-cards .poke-mon:nth-child(4) .poke-mon-sprite-wrap { animation-delay: 1.7s; }
+.community-cards .poke-mon:nth-child(5) .poke-mon-sprite-wrap { animation-delay: 2.2s; }
 
 .poke-sprite {
   image-rendering: pixelated;
   object-fit: contain;
+  transition: transform .3s ease;
 }
 
-/* Glow by type */
-.poke-mon.fire     .poke-mon-sprite-wrap { filter: drop-shadow(0 0 8px rgba(255,107,53,.7)); }
-.poke-mon.water    .poke-mon-sprite-wrap { filter: drop-shadow(0 0 8px rgba(41,182,246,.7)); }
-.poke-mon.grass    .poke-mon-sprite-wrap { filter: drop-shadow(0 0 8px rgba(102,187,106,.7)); }
-.poke-mon.electric .poke-mon-sprite-wrap { filter: drop-shadow(0 0 8px rgba(255,214,0,.7)); }
+.poke-mon:hover .poke-sprite {
+  transform: scale(1.15);
+}
 
-/* Highlight best-five mons */
+/* Enhanced drop shadow by type */
+.poke-mon.fire .poke-mon-sprite-wrap {
+  filter: drop-shadow(0 0 12px rgba(255,107,53,.9));
+}
+.poke-mon.water .poke-mon-sprite-wrap {
+  filter: drop-shadow(0 0 12px rgba(41,182,246,.9));
+}
+.poke-mon.grass .poke-mon-sprite-wrap {
+  filter: drop-shadow(0 0 12px rgba(102,187,106,.9));
+}
+.poke-mon.electric .poke-mon-sprite-wrap {
+  filter: drop-shadow(0 0 12px rgba(255,214,0,.9));
+}
+
+/* Pulse glow on hover */
+.poke-mon.fire:hover .poke-mon-sprite-wrap {
+  animation: glowPulse 1.5s ease-in-out infinite;
+  color: rgba(255,107,53,.9);
+}
+.poke-mon.water:hover .poke-mon-sprite-wrap {
+  animation: glowPulse 1.5s ease-in-out infinite;
+  color: rgba(41,182,246,.9);
+}
+.poke-mon.grass:hover .poke-mon-sprite-wrap {
+  animation: glowPulse 1.5s ease-in-out infinite;
+  color: rgba(102,187,106,.9);
+}
+.poke-mon.electric:hover .poke-mon-sprite-wrap {
+  animation: glowPulse 1.5s ease-in-out infinite;
+  color: rgba(255,214,0,.9);
+}
+
+/* Highlight best-five mons with celebration animation */
 .poke-mon.in-best .poke-mon-sprite-wrap {
-  filter: drop-shadow(0 0 10px rgba(255,215,0,.9)) brightness(1.15);
+  filter: drop-shadow(0 0 15px rgba(255,215,0,.9)) brightness(1.2);
   outline: 3px solid var(--gold);
   border-radius: 50%;
+  animation: celebrationBounce 1s ease-in-out infinite, glowPulse 2s ease-in-out infinite;
+  position: relative;
+}
+
+.poke-mon.in-best .poke-mon-sprite-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, transparent, rgba(255,215,0,0.3), transparent);
+  background-size: 200% 200%;
+  animation: shimmer 2s linear infinite;
+  pointer-events: none;
 }
 
 .poke-value-badge {
@@ -695,6 +865,12 @@ input[type="text"]:focus, input[type="number"]:focus {
   transition: background .2s;
 }
 .btn-lang:hover { background: rgba(255,255,255,.22); }
+
+/* Help button in lobby - full width at top of card */
+#btn-help-lobby {
+  width: 100%;
+  margin-bottom: 16px;
+}
 
 /* ─── Opponent card ───────────────────────────────────────────────────────── */
 .opponent-slot {
