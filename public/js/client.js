@@ -1747,10 +1747,7 @@
 
   // ─── BGM ──────────────────────────────────────────────────────────────────────
   (function initBgm() {
-    const bgm       = document.getElementById('bgm');
-    const volSlider = $('vol-slider');
-    const volValue  = $('vol-value');
-    const volPanel  = $('vol-panel');
+    const bgm = document.getElementById('bgm');
     if (!bgm) return;
 
     // ↓↓ 两个场景的 BGM ↓↓
@@ -1762,28 +1759,52 @@
     let isSwitching = false;  // Prevent concurrent switches
     bgm.volume = 0.15;
 
-    // Update slider display to match initial volume
-    if (volSlider) {
-      volSlider.value = bgm.volume;
-      if (volValue) volValue.textContent = Math.round(bgm.volume * 100) + '%';
-    }
+    // Get all volume control elements (both lobby and game)
+    const volSliders = [document.getElementById('vol-slider'), document.getElementById('vol-slider-lobby')].filter(Boolean);
+    const volValues = [document.getElementById('vol-value'), document.getElementById('vol-value-lobby')].filter(Boolean);
+    const volPanels = [document.getElementById('vol-panel'), document.getElementById('vol-panel-lobby')].filter(Boolean);
+    const btnVols = [document.getElementById('btn-vol'), document.getElementById('btn-vol-lobby')].filter(Boolean);
 
-    // Toggle volume panel
-    const btnVol = $('btn-vol');
-    if (btnVol && volPanel) {
-      btnVol.addEventListener('click', () => volPanel.classList.toggle('hidden'));
-    }
+    // Sync all sliders to initial volume
+    volSliders.forEach(slider => {
+      if (slider) slider.value = bgm.volume;
+    });
+    volValues.forEach(valueEl => {
+      if (valueEl) valueEl.textContent = Math.round(bgm.volume * 100) + '%';
+    });
 
-    // Volume slider
-    if (volSlider) {
-      volSlider.addEventListener('input', () => {
-        const v = parseFloat(volSlider.value);
-        bgm.volume = v;
-        if (volValue) volValue.textContent = Math.round(v * 100) + '%';
-        if (v > 0 && bgm.paused && bgm.src) bgm.play().catch(() => {});
-        else if (v === 0) bgm.pause();
+    // Function to update all volume displays
+    function updateAllVolumeDisplays(volume) {
+      volSliders.forEach(slider => {
+        if (slider) slider.value = volume;
+      });
+      volValues.forEach(valueEl => {
+        if (valueEl) valueEl.textContent = Math.round(volume * 100) + '%';
       });
     }
+
+    // Toggle volume panels
+    btnVols.forEach((btnVol, index) => {
+      const panel = volPanels[index];
+      if (btnVol && panel) {
+        btnVol.addEventListener('click', () => {
+          panel.classList.toggle('hidden');
+        });
+      }
+    });
+
+    // Volume sliders - sync all sliders
+    volSliders.forEach(slider => {
+      if (slider) {
+        slider.addEventListener('input', () => {
+          const v = parseFloat(slider.value);
+          bgm.volume = v;
+          updateAllVolumeDisplays(v);
+          if (v > 0 && bgm.paused && bgm.src) bgm.play().catch(() => {});
+          else if (v === 0) bgm.pause();
+        });
+      }
+    });
 
     // Switch BGM track (crossfade-ish: fade out → swap → fade in)
     window.switchBgm = function(url) {
@@ -1810,7 +1831,9 @@
         isSwitching = false;
       }
       
-      const targetVol = parseFloat(volSlider?.value || 0.35);
+      // Get current volume from any available slider
+      const currentSlider = volSliders.find(s => s) || { value: 0.15 };
+      const targetVol = parseFloat(currentSlider.value);
       
       // If BGM is not playing (failed to start or paused), try direct switch
       if (bgm.paused || !bgm.src) {
@@ -1867,7 +1890,8 @@
       const url = currentBgmUrl || BGM_LOBBY;
       currentBgmUrl = url;
       bgm.src = url;
-      bgm.volume = parseFloat(volSlider?.value || 0.15);
+      const currentSlider = volSliders.find(s => s) || { value: 0.15 };
+      bgm.volume = parseFloat(currentSlider.value);
       console.log('[BGM] Attempting to play:', url);
       bgm.play().catch(err => {
         console.log('[BGM] Initial autoplay blocked:', err);

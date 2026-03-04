@@ -18,7 +18,14 @@
       <div class="title-pokeball"></div>
       <h1 class="game-title">Pocket<br/>Monsters<br/><span>Battle</span></h1>
       <p class="game-subtitle" data-i18n="subtitle">集结最强阵容，决战宝可梦擂台！</p>
-      <button class="btn-lang" id="btn-lang">English</button>
+      <div style="display:flex;gap:8px;justify-content:center;align-items:center;">
+        <button class="btn-lang" id="btn-lang">English</button>
+        <button class="btn-vol" id="btn-vol-lobby" title="BGM">🎵</button>
+      </div>
+      <div class="vol-panel hidden" id="vol-panel-lobby" style="margin-top:8px;">
+        <input type="range" id="vol-slider-lobby" min="0" max="1" step="0.05" value="0.15" />
+        <span id="vol-value-lobby">15%</span>
+      </div>
     </div>
 
     <div class="lobby-card">

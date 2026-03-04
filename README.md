@@ -2,6 +2,8 @@
 
 一款基于德州扑克规则的多人神奇宝贝对战游戏。
 
+🎮 **在线试玩**: https://pocket-monsters-production.up.railway.app/
+
 ## ✨ 核心特性
 
 - 🎮 **多人实时对战** - 支持 2-8 人同时游戏，基于 WebSocket 实时同步
