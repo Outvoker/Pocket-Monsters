@@ -899,6 +899,7 @@ io.on('connection', socket => {
         const player = room.players[idx];
         room.players[idx].connected = false;
         room.players[idx].folded = true;
+        const wasInNeedsToAct = room.needsToAct.has(socket.id);
         room.needsToAct.delete(socket.id);
         // Update leaderboard when player disconnects mid-game
         if (!player.isBot) {
@@ -915,8 +916,13 @@ io.on('connection', socket => {
             }
           }, 3000);
         } else {
-          if (room.players[room.turnIndex]?.id === socket.id) checkAndAdvance(room);
-          else emitGameState(room);
+          // Always check and advance if the player was waiting to act or if it's their turn
+          // This ensures the game doesn't get stuck waiting for a disconnected player
+          if (wasInNeedsToAct || room.players[room.turnIndex]?.id === socket.id) {
+            checkAndAdvance(room);
+          } else {
+            emitGameState(room);
+          }
         }
       }
       broadcastRoomList();
