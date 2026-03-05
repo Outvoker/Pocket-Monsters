@@ -422,9 +422,9 @@ function startGame(room) {
   room._endGameCalled = false;
   room._autoRevealing = false;
 
-  // Mark players with no chips as spectators for this round
+  // Mark players with no chips or disconnected as spectators for this round
   for (const p of room.players) {
-    p.spectator = (p.chips <= 0);
+    p.spectator = (p.chips <= 0 || !p.connected);
     p.hand=[]; p.folded=false; p.allIn=false; p.bet=0; p.totalBet=0; p.bestHand=null;
   }
 
@@ -446,7 +446,7 @@ function startGame(room) {
   // Map index back to global players array
   const firstPlayer = rp[firstIdx];
   room.turnIndex = room.players.findIndex(p => p.id === firstPlayer.id);
-  room.needsToAct = new Set(rp.filter(p => !p.allIn).map(p => p.id));
+  room.needsToAct = new Set(rp.filter(p => !p.allIn && p.connected).map(p => p.id));
   emitGameState(room);
 }
 
@@ -465,7 +465,7 @@ function startBettingRound(room) {
     firstRpIdx = (firstRpIdx + 1) % n;
   }
   room.turnIndex = room.players.findIndex(p => p.id === rp[firstRpIdx].id);
-  room.needsToAct = new Set(room.activePlayers().map(p => p.id));
+  room.needsToAct = new Set(room.activePlayers().filter(p => p.connected).map(p => p.id));
   if (room.needsToAct.size === 0) { proceedToNextPhase(room); return; }
   emitGameState(room);
 }
@@ -475,7 +475,7 @@ function advanceToNextPlayer(room) {
   let idx = (room.turnIndex + 1) % n;
   for (let i = 0; i < n; i++) {
     const p = room.players[idx];
-    if (!p.folded && !p.allIn && !p.spectator && room.needsToAct.has(p.id)) break;
+    if (!p.folded && !p.allIn && !p.spectator && p.connected && room.needsToAct.has(p.id)) break;
     idx = (idx + 1) % n;
   }
   room.turnIndex = idx;
@@ -485,7 +485,7 @@ function checkAndAdvance(room) {
   const nf = room.nonFoldedPlayers();
   if (nf.length <= 1) { proceedToNextPhase(room); return; }
   const stillNeed = [...room.needsToAct].filter(id => {
-    const p = room.playerById(id); return p && !p.folded && !p.allIn && !p.spectator;
+    const p = room.playerById(id); return p && !p.folded && !p.allIn && !p.spectator && p.connected;
   });
   if (stillNeed.length === 0) { proceedToNextPhase(room); return; }
   advanceToNextPlayer(room);
