@@ -20,6 +20,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.history/
 
 # Runtime
 *.pid
