@@ -2,6 +2,7 @@ const express  = require('express');
 const http      = require('http');
 const { Server } = require('socket.io');
 const path      = require('path');
+const fs        = require('fs');
 const GL        = require('./shared/gameLogic');
 
 const app    = express();
@@ -11,6 +12,8 @@ const io     = new Server(server, { cors: { origin: '*' } });
 app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = {};
+let leaderboard = {};
+const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard.json');
 
 const BLIND_LEVELS = [           // [small, big]
   [10,  20],
@@ -79,8 +82,51 @@ function makePlayer(id, name) {
            bet:0, totalBet:0, connected:true, bestHand:null, isBot:false };
 }
 
+function loadLeaderboard() {
+  try {
+    if (fs.existsSync(LEADERBOARD_FILE)) {
+      const data = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
+      leaderboard = JSON.parse(data);
+      console.log(`📊 Loaded ${Object.keys(leaderboard).length} leaderboard entries`);
+    } else {
+      console.log('📊 No existing leaderboard file, starting fresh');
+    }
+  } catch (err) {
+    console.error('❌ Error loading leaderboard:', err);
+    leaderboard = {};
+  }
+}
+
+function saveLeaderboard() {
+  try {
+    fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(leaderboard, null, 2), 'utf8');
+  } catch (err) {
+    console.error('❌ Error saving leaderboard:', err);
+  }
+}
+
+function updateLeaderboard(playerName, chips) {
+  if (!playerName || playerName.startsWith('训练家')) return;
+  const delta = chips - 1000;
+  if (!leaderboard[playerName]) {
+    leaderboard[playerName] = { name: playerName, totalScore: 0, gamesPlayed: 0 };
+  }
+  leaderboard[playerName].totalScore += delta;
+  leaderboard[playerName].gamesPlayed += 1;
+  saveLeaderboard();
+}
+
+function getLeaderboard() {
+  return Object.values(leaderboard)
+    .sort((a, b) => b.totalScore - a.totalScore)
+    .slice(0, 50);
+}
+
 // ─── Bot helpers ─────────────────────────────────────────────────────────────
-const BOT_NAMES = ['小智','小霞','小刚','大木博士','火箭队喵喵','小次郎','小兰','阿桂'];
+const BOT_NAMES = [
+  '小智', '小霞', '小刚', '小茂', '小建', '小遥', '小胜', '小光',
+  '大木博士', '武藏', '小次郎', '喵喵', '坂木老大', 
+];
 
 function isBotId(id) { return typeof id === 'string' && id.startsWith('BOT_'); }
 
@@ -653,6 +699,12 @@ function endGame(room, winners) {
       room.finalChampion = champion
         ? { id: champion.id, name: champion.name, chips: champion.chips, hand: champion.hand }
         : null;
+      // Update leaderboard for all non-bot players when game ends
+      for (const p of room.players) {
+        if (!p.isBot) {
+          updateLeaderboard(p.name, p.chips);
+        }
+      }
       room.phase = GL.PHASES.WAITING;
       // Keep everyone in the room so they see the final screen
       emitGameState(room);
@@ -733,12 +785,15 @@ io.on('connection', socket => {
   socket.on('add_bot', ({ roomId }) => {
     const room = rooms[roomId];
     if (!room) return;
-    if (room.hostId !== socket.id) return socket.emit('error', { msg: '只有房主才能添加机器人' });
-    if (room.phase !== GL.PHASES.WAITING) return socket.emit('error', { msg: '只能在等待阶段添加机器人' });
+    if (room.hostId !== socket.id) return socket.emit('error', { msg: '只有房主才能添加训练家' });
+    if (room.phase !== GL.PHASES.WAITING) return socket.emit('error', { msg: '只能在等待阶段添加训练家' });
     if (room.players.length >= room.maxPlayers) return socket.emit('error', { msg: '房间已满' });
     const usedNames = new Set(room.players.map(p => p.name));
     const available = BOT_NAMES.filter(n => !usedNames.has(n));
-    const botName = available.length ? available[0] : `机器人${room.players.length}`;
+    // Randomly select from available names instead of always picking the first one
+    const botName = available.length 
+      ? available[Math.floor(Math.random() * available.length)] 
+      : `训练家${room.players.length}`;
     room.players.push(makeBotPlayer(botName));
     emitGameState(room);
     broadcastRoomList();
@@ -747,10 +802,10 @@ io.on('connection', socket => {
   socket.on('remove_bot', ({ roomId }) => {
     const room = rooms[roomId];
     if (!room) return;
-    if (room.hostId !== socket.id) return socket.emit('error', { msg: '只有房主才能移除机器人' });
-    if (room.phase !== GL.PHASES.WAITING) return socket.emit('error', { msg: '只能在等待阶段移除机器人' });
+    if (room.hostId !== socket.id) return socket.emit('error', { msg: '只有房主才能移除训练家' });
+    if (room.phase !== GL.PHASES.WAITING) return socket.emit('error', { msg: '只能在等待阶段移除训练家' });
     const lastBotIdx = [...room.players].reverse().findIndex(p => p.isBot);
-    if (lastBotIdx === -1) return socket.emit('error', { msg: '没有可移除的机器人' });
+    if (lastBotIdx === -1) return socket.emit('error', { msg: '没有可移除的训练家' });
     room.players.splice(room.players.length - 1 - lastBotIdx, 1);
     emitGameState(room);
     broadcastRoomList();
@@ -763,6 +818,10 @@ io.on('connection', socket => {
     const nonSpec = room.players.filter(p => p.chips > 0);
     if (nonSpec.length < room.minPlayers) return socket.emit('error', { msg: `至少需要 ${room.minPlayers} 名玩家` });
     startGame(room); broadcastRoomList();
+  });
+
+  socket.on('get_leaderboard', () => {
+    socket.emit('leaderboard_data', getLeaderboard());
   });
 
   socket.on('player_action', ({ roomId, action, amount }) => {
@@ -837,9 +896,14 @@ io.on('connection', socket => {
         if (room.hostId === socket.id) { room.hostId = room.players.find(p => !p.isBot)?.id || room.players[0].id; room.hostName = room.players.find(p => !p.isBot)?.name || room.players[0].name; }
         emitGameState(room);
       } else {
+        const player = room.players[idx];
         room.players[idx].connected = false;
         room.players[idx].folded = true;
         room.needsToAct.delete(socket.id);
+        // Update leaderboard when player disconnects mid-game
+        if (!player.isBot) {
+          updateLeaderboard(player.name, player.chips);
+        }
         // Check if only bots remain after this disconnect; close after a short delay
         // so the current pending action can resolve cleanly
         const stillHuman = room.players.some(p => !p.isBot && p.id !== socket.id);
@@ -859,6 +923,9 @@ io.on('connection', socket => {
     }
   });
 });
+
+// Load leaderboard data on startup
+loadLeaderboard();
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🎮 Pocket Monsters running at http://localhost:${PORT}`));

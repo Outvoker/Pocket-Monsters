@@ -30,6 +30,7 @@
 
     <div class="lobby-card">
       <button class="btn btn-purple" id="btn-help-lobby" data-i18n="helpManual">📖 精灵图鉴</button>
+      <button class="btn btn-gold" id="btn-leaderboard-lobby" data-i18n="leaderboard">🏆 训练家殿堂</button>
       
       <div class="input-row">
         <label data-i18n="trainerName">训练家名称</label>
@@ -71,6 +72,8 @@
       <button class="btn-lang" id="btn-lang-game">English</button>
       <!-- Help -->
       <button class="btn-help" id="btn-help" title="帮助">?</button>
+      <!-- Leaderboard -->
+      <button class="btn-leaderboard" id="btn-leaderboard" title="训练家殿堂">🏆</button>
       <!-- Volume control -->
       <button class="btn-vol" id="btn-vol" title="BGM">🎵</button>
       <div class="vol-panel hidden" id="vol-panel">
@@ -267,6 +270,18 @@
     </section>
   </div>
 </div>
+<!-- ── LEADERBOARD OVERLAY ─────────────────────────────────────────────────── -->
+<div id="leaderboard-overlay" class="overlay hidden leaderboard-overlay">
+  <div class="leaderboard-box">
+    <button class="help-close" id="leaderboard-close">✕</button>
+    <h2 class="leaderboard-title">🏆 训练家殿堂</h2>
+    <p class="leaderboard-subtitle">传奇训练家荣誉榜</p>
+    <div id="leaderboard-content" class="leaderboard-content">
+      <div class="leaderboard-loading">加载中...</div>
+    </div>
+  </div>
+</div>
+
 <!-- ── CARD ENTRY OVERLAY ───────────────────────────────────────────────────── -->
 <div id="card-entry-overlay" class="card-entry-overlay hidden">
   <div id="card-entry-effects" class="card-entry-effects"></div>

@@ -62,7 +62,10 @@
       blindsNow:      (s, b) => `入场费: ${s}/${b}`,
       roundLabel:     r => `第 ${r} 局`,
       handLabel:      '持有精灵',
-      communityLabel: '对战场地',    },
+      communityLabel: '对战场地',
+      leaderboard:    '🏆 训练家殿堂',
+      helpManual:     '📖 精灵图鉴',
+    },
     en: {
       subtitle:       'Assemble your strongest team and battle!',
       trainerName:    'Trainer Name',
@@ -119,6 +122,8 @@
       roundLabel:     r => `Round ${r}`,
       handLabel:      'Your Pokémon',
       communityLabel: 'Field',
+      leaderboard:    '🏆 Hall of Fame',
+      helpManual:     '📖 Pokédex',
     },
   };
 
@@ -351,6 +356,9 @@
     socket.on('action_log',   data  => showActionLog(data));
     socket.on('error',        ({ msg }) => showToast(msg, 'error'));
     socket.on('disconnect',   () => showToast('连接断开', 'error'));
+    socket.on('leaderboard_data', data => {
+      if (window.renderLeaderboardData) window.renderLeaderboardData(data);
+    });
   }
   // ─── Action log feed ───────────────────────────────────────────────────────────────
   const ACTION_ICON  = { fold: '🏳️', check: '💪', call: '⚔️', raise: '⬆️', allin: '💥' };
@@ -602,10 +610,7 @@
     // ─── BGM switch: lobby vs battle ─────────────────────────────────────────
     if (typeof window.switchBgm === 'function') {
       const targetBgm = state.phase === 'waiting' ? window.BGM_LOBBY : window.BGM_BATTLE;
-      console.log('[renderGame] Phase:', state.phase, 'Target BGM:', targetBgm);
       window.switchBgm(targetBgm);
-    } else {
-      console.log('[renderGame] switchBgm not available yet');
     }
 
     const phaseKey   = state.phase;
@@ -1060,7 +1065,7 @@
     if (fightSfx) {
       fightSfx.currentTime = 0;
       fightSfx.volume = 0.7;
-      fightSfx.play().catch(e => console.log('Fight SFX play failed:', e));
+      fightSfx.play().catch(e => {});
     }
     
     // Hide banner after 2 seconds
@@ -1104,7 +1109,7 @@
       // Play battle music when attack animation starts
       const battleSfx = new Audio('/audio/battle.mp3');
       battleSfx.volume = 0.5;
-      battleSfx.play().catch(e => console.log('Battle SFX play failed:', e));
+      battleSfx.play().catch(e => {});
       
       p1El.classList.add('tournament-attacking');
       p2El.classList.add('tournament-attacking');
@@ -1217,7 +1222,7 @@
     // Play victory music as one-time sound effect
     const victorySfx = new Audio('/audio/victory.mp3');
     victorySfx.volume = 0.5;
-    victorySfx.play().catch(e => console.log('Victory SFX play failed:', e));
+    victorySfx.play().catch(e => {});
     
     // Calculate total tournament animation time
     const bracket = state.tournamentBracket || [];
@@ -1523,50 +1528,76 @@
     // Create type-specific large-scale effects
     effectsContainer.innerHTML = '';
     
+    // Get viewport dimensions for responsive positioning
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    
     if (card.type === 'fire') {
-      // Fire: Multiple large flames rising from bottom (increased to 15)
-      for (let i = 0; i < 15; i++) {
+      // Fire: Row of flames rising from bottom simultaneously
+      const flameCount = Math.min(12, Math.floor(vw / 80));
+      for (let i = 0; i < flameCount; i++) {
         const flame = document.createElement('div');
         flame.className = 'effect-element';
-        const offset = (i - 7) * 50; // Spread flames horizontally
+        // Spread flames evenly across bottom (80% of screen width)
+        const spreadWidth = vw * 0.8;
+        const spacing = spreadWidth / (flameCount - 1);
+        const offset = (i * spacing) - (spreadWidth / 2);
         flame.style.left = `calc(50% + ${offset}px)`;
-        flame.style.animationDuration = `${1.2 + Math.random() * 1}s`;
-        flame.style.animationDelay = `${i * 0.1}s`;
-        flame.style.transform = `translate(-50%, 0) scale(${0.7 + Math.random() * 0.5})`;
+        flame.style.animationDuration = `${1.8 + Math.random() * 0.6}s`;
+        flame.style.animationDelay = `${Math.random() * 0.2}s`;
+        flame.style.transform = `translate(-50%, 0) scale(${0.8 + Math.random() * 0.4})`;
         effectsContainer.appendChild(flame);
       }
     } else if (card.type === 'grass') {
-      // Grass: Many leaves falling from top (increased to 35)
-      for (let i = 0; i < 35; i++) {
+      // Grass: Leaves randomly distributed across entire screen, falling continuously
+      const leafCount = Math.min(60, Math.floor((vw * vh) / 6000));
+      for (let i = 0; i < leafCount; i++) {
         const leaf = document.createElement('div');
         leaf.className = 'effect-element';
-        const offset = (Math.random() - 0.5) * 500; // Random horizontal spread
-        leaf.style.left = `calc(50% + ${offset}px)`;
-        leaf.style.animationDuration = `${2 + Math.random() * 1.5}s`;
-        leaf.style.animationDelay = `${i * 0.08}s`;
-        leaf.style.transform = `translate(-50%, 0) scale(${0.6 + Math.random() * 0.7}) rotate(${Math.random() * 360}deg)`;
+        // Random horizontal position across full screen width
+        const xOffset = (Math.random() - 0.5) * vw * 0.98;
+        leaf.style.left = `calc(50% + ${xOffset}px)`;
+        // Random vertical position across entire screen height (including above and on screen)
+        const yStart = -40 + Math.random() * 140; // From -40vh to 100vh (covers whole screen)
+        leaf.style.top = `${yStart}vh`;
+        leaf.style.animationDuration = `${2.5 + Math.random() * 1.5}s`;
+        leaf.style.animationDelay = `${Math.random() * 0.2}s`;
+        // Random size, rotation, and horizontal drift
+        const scale = 0.5 + Math.random() * 0.7;
+        const rotation = Math.random() * 360;
+        const drift = (Math.random() - 0.5) * 120; // Horizontal drift during fall
+        leaf.style.setProperty('--drift', `${drift}px`);
+        leaf.style.transform = `translate(-50%, 0) scale(${scale}) rotate(${rotation}deg)`;
         effectsContainer.appendChild(leaf);
       }
     } else if (card.type === 'electric') {
-      // Electric: Lightning bolts striking from sky (increased to 12)
-      for (let i = 0; i < 12; i++) {
+      // Electric: Lightning bolts striking from top to bottom in zigzag pattern
+      const boltCount = Math.min(8, Math.floor(vw / 100) + 2);
+      for (let i = 0; i < boltCount; i++) {
         const bolt = document.createElement('div');
         bolt.className = 'effect-element';
-        const offset = (i - 5.5) * 60; // Spread lightning bolts
+        // Spread bolts across screen
+        const spreadWidth = vw * 0.7;
+        const spacing = spreadWidth / (boltCount - 1);
+        const offset = (i * spacing) - (spreadWidth / 2);
         bolt.style.left = `calc(50% + ${offset}px)`;
-        bolt.style.animationDelay = `${i * 0.2}s`;
-        bolt.style.transform = `translate(-50%, 0) rotate(${(Math.random() - 0.5) * 20}deg)`;
-        bolt.style.width = `${6 + Math.random() * 4}px`;
+        bolt.style.animationDelay = `${i * 0.15 + Math.random() * 0.1}s`;
+        // Random slight rotation for variety
+        bolt.style.transform = `translateX(-50%) rotate(${(Math.random() - 0.5) * 8}deg)`;
         effectsContainer.appendChild(bolt);
       }
     } else if (card.type === 'water') {
-      // Water: Surging waves from bottom (increased to 8)
-      for (let i = 0; i < 8; i++) {
+      // Water: Waves sweeping from left to right
+      const waveCount = 6;
+      for (let i = 0; i < waveCount; i++) {
         const wave = document.createElement('div');
         wave.className = 'effect-element';
-        wave.style.animationDelay = `${i * 0.2}s`;
-        wave.style.transform = `translate(-50%, 0) scale(${1 + i * 0.12})`;
-        wave.style.opacity = `${0.85 - i * 0.1}`;
+        // Stagger waves vertically for depth effect
+        const verticalOffset = (i - waveCount / 2) * (vh * 0.08);
+        wave.style.top = `calc(50% + ${verticalOffset}px)`;
+        wave.style.animationDelay = `${i * 0.15}s`;
+        wave.style.animationDuration = `${1.6 + Math.random() * 0.4}s`;
+        wave.style.opacity = `${0.7 - i * 0.08}`;
         effectsContainer.appendChild(wave);
       }
     }
@@ -1581,11 +1612,13 @@
     const emojis = particleEmojis[card.type] || ['✨', '💫', '⭐'];
     
     particlesContainer.innerHTML = '';
+    // Use viewport-relative particle burst distance
+    const baseDistance = Math.min(vw, vh) * 0.25;
     for (let i = 0; i < 20; i++) {
       const particle = document.createElement('div');
       particle.className = 'card-entry-particle';
       const angle = (i / 20) * Math.PI * 2;
-      const distance = 150 + Math.random() * 100;
+      const distance = baseDistance + Math.random() * (baseDistance * 0.4);
       const tx = Math.cos(angle) * distance;
       const ty = Math.sin(angle) * distance;
       particle.style.setProperty('--tx', `${tx}px`);
@@ -1808,11 +1841,8 @@
 
     // Switch BGM track (crossfade-ish: fade out → swap → fade in)
     window.switchBgm = function(url) {
-      console.log('[BGM] switchBgm called:', url, 'current:', currentBgmUrl, 'userInteracted:', userInteracted, 'isSwitching:', isSwitching);
-      
       // If already switching to this URL or it's the current URL, skip
       if (currentBgmUrl === url && !bgm.paused) {
-        console.log('[BGM] Already playing this URL');
         return;
       }
       
@@ -1821,13 +1851,11 @@
       
       if (!userInteracted) {
         // Store the desired BGM URL, will be played on first interaction
-        console.log('[BGM] User not interacted yet, storing URL for later');
         return;
       }
       
       // If already switching, cancel and start new switch immediately
       if (isSwitching) {
-        console.log('[BGM] Already switching, forcing immediate switch to:', url);
         isSwitching = false;
       }
       
@@ -1837,23 +1865,18 @@
       
       // If volume is 0 (muted), just switch the source without playing
       if (targetVol === 0) {
-        console.log('[BGM] Volume is 0 (muted), switching source but staying paused');
         bgm.pause();
         bgm.src = url;
         bgm.volume = 0;
+        currentBgmUrl = url;
         return;
       }
       
       // If BGM is not playing (failed to start or paused), try direct switch
       if (bgm.paused || !bgm.src) {
-        console.log('[BGM] BGM not playing, attempting direct switch');
         bgm.src = url;
         bgm.volume = targetVol;
-        bgm.play().catch(err => {
-          console.log('[BGM] Autoplay blocked:', err);
-        }).then(() => {
-          console.log('[BGM] Playing:', url);
-        });
+        bgm.play().catch(err => {});
         return;
       }
       
@@ -1871,11 +1894,9 @@
           bgm.src = url;
           bgm.volume = 0;
           bgm.play().catch(err => {
-            console.log('[BGM] play failed:', err);
             bgm.volume = targetVol; // Restore volume for next attempt
             isSwitching = false;
           }).then(() => {
-            console.log('[BGM] Now playing:', url);
             // Quick fade in
             let fadeIn = setInterval(() => {
               if (bgm.volume < targetVol - fadeOutStep) {
@@ -1894,20 +1915,13 @@
     // Auto-start BGM on first user interaction (browsers block autoplay)
     function tryPlayBgm() {
       if (userInteracted) return; // Already initialized
-      console.log('[BGM] First user interaction detected');
       userInteracted = true;
       const url = currentBgmUrl || BGM_LOBBY;
       currentBgmUrl = url;
       bgm.src = url;
       const currentSlider = volSliders.find(s => s) || { value: 0.15 };
       bgm.volume = parseFloat(currentSlider.value);
-      console.log('[BGM] Attempting to play:', url);
-      bgm.play().catch(err => {
-        console.log('[BGM] Initial autoplay blocked:', err);
-        // Will retry on next switchBgm call
-      }).then(() => {
-        console.log('[BGM] Successfully started playing:', url);
-      });
+      bgm.play().catch(err => {});
     }
     document.addEventListener('click', tryPlayBgm);
     document.addEventListener('touchstart', tryPlayBgm);
@@ -1969,6 +1983,82 @@
     if (btnHelpLobby) btnHelpLobby.addEventListener('click', openHelp);
     if (btnClose) btnClose.addEventListener('click', () => overlay.classList.add('hidden'));
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
+  })();
+
+  // ─── Leaderboard overlay ──────────────────────────────────────────────────────
+  (function initLeaderboard() {
+    const overlay = document.getElementById('leaderboard-overlay');
+    const btnLeaderboard = document.getElementById('btn-leaderboard');
+    const btnLeaderboardLobby = document.getElementById('btn-leaderboard-lobby');
+    const btnClose = document.getElementById('leaderboard-close');
+    const content = document.getElementById('leaderboard-content');
+    if (!overlay) return;
+
+    function openLeaderboard() {
+      overlay.classList.remove('hidden');
+      const loadingText = lang === 'zh' ? '加载中...' : 'Loading...';
+      content.innerHTML = `<div class="leaderboard-loading">${loadingText}</div>`;
+      
+      // Update title and subtitle based on language
+      const title = overlay.querySelector('.leaderboard-title');
+      const subtitle = overlay.querySelector('.leaderboard-subtitle');
+      if (title) title.textContent = lang === 'zh' ? '🏆 训练家殿堂' : '🏆 Hall of Fame';
+      if (subtitle) subtitle.textContent = lang === 'zh' ? '传奇训练家荣誉榜' : 'Legendary Trainers Honor Roll';
+      
+      socket.emit('get_leaderboard');
+    }
+
+    function renderLeaderboard(data) {
+      const noDataText = lang === 'zh' ? '暂无排行数据' : 'No leaderboard data';
+      if (!data || data.length === 0) {
+        content.innerHTML = `<div class="leaderboard-loading">${noDataText}</div>`;
+        return;
+      }
+
+      const headers = lang === 'zh' 
+        ? { rank: '排名', name: '训练家', score: '总分', games: '场次' }
+        : { rank: 'Rank', name: 'Trainer', score: 'Score', games: 'Games' };
+
+      const rows = data.map((entry, idx) => {
+        const rank = idx + 1;
+        const rankClass = rank === 1 ? 'top-1' : rank === 2 ? 'top-2' : rank === 3 ? 'top-3' : '';
+        const scoreClass = entry.totalScore >= 0 ? 'positive' : 'negative';
+        const scoreSign = entry.totalScore >= 0 ? '+' : '';
+        
+        return `
+          <tr>
+            <td class="leaderboard-rank ${rankClass}">${rank}</td>
+            <td class="leaderboard-name">${escHtml(entry.name)}</td>
+            <td class="leaderboard-score ${scoreClass}">${scoreSign}${entry.totalScore}</td>
+            <td class="leaderboard-games">${entry.gamesPlayed}</td>
+          </tr>
+        `;
+      }).join('');
+
+      content.innerHTML = `
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th>${headers.rank}</th>
+              <th>${headers.name}</th>
+              <th>${headers.score}</th>
+              <th>${headers.games}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      `;
+    }
+
+    if (btnLeaderboard) btnLeaderboard.addEventListener('click', openLeaderboard);
+    if (btnLeaderboardLobby) btnLeaderboardLobby.addEventListener('click', openLeaderboard);
+    if (btnClose) btnClose.addEventListener('click', () => overlay.classList.add('hidden'));
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
+
+    // Expose renderLeaderboard globally for socket handler
+    window.renderLeaderboardData = renderLeaderboard;
   })();
 
   // ─── Boot ─────────────────────────────────────────────────────────────────────

@@ -24,4 +24,7 @@ Thumbs.db
 # Runtime
 *.pid
 
+# Data files
+leaderboard.json
+
 

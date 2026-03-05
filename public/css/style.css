@@ -125,28 +125,31 @@
 
 @keyframes fireFlames {
   0% {
-    transform: translate(-50%, 100%) scale(0.8);
+    transform: translate(-50%, 0) scale(0.8) scaleY(0.3);
     opacity: 0;
   }
-  20% {
-    opacity: 0.9;
+  15% {
+    opacity: 0.95;
   }
   100% {
-    transform: translate(-50%, -400px) scale(1.8);
+    transform: translate(-50%, -80vh) scale(1.5) scaleY(2);
     opacity: 0;
   }
 }
 
 @keyframes grassLeaves {
   0% {
-    transform: translate(-50%, -300px) rotate(0deg) scale(1);
+    transform: translate(calc(-50% + var(--drift, 0px) * 0), 0) rotate(0deg);
     opacity: 0;
   }
   10% {
     opacity: 1;
   }
+  50% {
+    transform: translate(calc(-50% + var(--drift, 0px) * 0.5), 60vh) rotate(540deg);
+  }
   100% {
-    transform: translate(-50%, 300px) rotate(1080deg) scale(0.5);
+    transform: translate(calc(-50% + var(--drift, 0px)), 130vh) rotate(1080deg);
     opacity: 0;
   }
 }
@@ -154,32 +157,33 @@
 @keyframes electricBolt {
   0% {
     opacity: 0;
-    transform: translate(-50%, -300px) scaleY(0);
+    clip-path: polygon(50% 0%, 50% 0%, 50% 0%, 50% 0%);
   }
-  5% {
+  3% {
     opacity: 1;
-    transform: translate(-50%, -300px) scaleY(1);
+    clip-path: polygon(45% 0%, 55% 0%, 60% 100%, 40% 100%);
   }
-  10% {
+  6% {
+    opacity: 1;
+  }
+  9% {
     opacity: 0;
-    transform: translate(-50%, -300px) scaleY(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -300px) scaleY(1);
   }
 }
 
 @keyframes waterWaves {
   0% {
-    transform: translate(-50%, 50%) scaleX(0.3) scaleY(0.5);
+    transform: translate(-150%, 0) scaleX(0.3) scaleY(0.8) skewX(-15deg);
     opacity: 0;
   }
-  30% {
-    opacity: 0.8;
+  20% {
+    opacity: 0.9;
   }
   100% {
-    transform: translate(-50%, -50%) scaleX(2) scaleY(1.5);
+    transform: translate(50%, 0) scaleX(1.5) scaleY(1.2) skewX(15deg);
     opacity: 0;
   }
 }
@@ -1008,8 +1012,9 @@ input[type="text"]:focus, input[type="number"]:focus {
   position: fixed;
   left: 50%;
   top: 50%;
-  width: 600px;
-  height: 600px;
+  width: min(600px, 90vw);
+  height: min(600px, 90vh);
+  transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 9998;
 }
@@ -1018,29 +1023,29 @@ input[type="text"]:focus, input[type="number"]:focus {
 .card-entry-effects.fire .effect-element {
   position: absolute;
   left: 50%;
-  bottom: 0;
-  width: 80px;
-  height: 120px;
+  bottom: -5vh;
+  width: min(70px, 11vw);
+  height: min(140px, 23vh);
   background: radial-gradient(
     ellipse at center bottom,
-    rgba(255, 255, 100, 0.9) 0%,
-    rgba(255, 140, 0, 0.8) 30%,
-    rgba(255, 69, 0, 0.7) 60%,
+    rgba(255, 255, 200, 1) 0%,
+    rgba(255, 200, 0, 0.95) 15%,
+    rgba(255, 140, 0, 0.9) 35%,
+    rgba(255, 69, 0, 0.75) 60%,
     rgba(255, 0, 0, 0.5) 80%,
     transparent 100%
   );
   border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  animation: fireFlames 2s ease-out infinite;
-  filter: blur(3px);
+  animation: fireFlames 2.2s ease-out forwards;
+  filter: blur(4px);
 }
 
 /* Grass Type - Leaf shapes falling down */
 .card-entry-effects.grass .effect-element {
   position: absolute;
   left: 50%;
-  top: -50px;
-  width: 40px;
-  height: 60px;
+  width: min(40px, 7vw);
+  height: min(60px, 10vh);
   background: linear-gradient(
     135deg,
     rgba(102, 187, 106, 0.9) 0%,
@@ -1048,49 +1053,64 @@ input[type="text"]:focus, input[type="number"]:focus {
     rgba(56, 142, 60, 0.7) 100%
   );
   border-radius: 0 100% 100% 0;
-  animation: grassLeaves 3s ease-in-out infinite;
+  animation: grassLeaves 3s ease-in-out forwards;
   clip-path: polygon(0% 50%, 100% 0%, 100% 100%);
+  --drift: 0px;
 }
 
 /* Electric Type - Lightning bolt from sky */
 .card-entry-effects.electric .effect-element {
   position: absolute;
   left: 50%;
-  top: -300px;
-  width: 8px;
-  height: 400px;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(255, 235, 59, 0.9) 20%,
-    rgba(255, 214, 0, 0.8) 50%,
-    rgba(255, 193, 7, 0.6) 80%,
-    transparent 100%
+  top: -5vh;
+  width: min(30px, 5vw);
+  height: 110vh;
+  transform: translateX(-50%);
+  background: 
+    linear-gradient(to bottom, transparent 0%, transparent 100%),
+    conic-gradient(from 90deg at 50% 0%, 
+      rgba(255, 255, 255, 0) 0deg,
+      rgba(255, 255, 255, 1) 10deg,
+      rgba(255, 235, 59, 0.95) 20deg,
+      rgba(255, 214, 0, 0.9) 30deg,
+      rgba(255, 235, 59, 0.95) 40deg,
+      rgba(255, 255, 255, 1) 50deg,
+      rgba(255, 255, 255, 0) 60deg
+    );
+  clip-path: polygon(
+    48% 0%, 52% 0%,
+    52% 25%, 58% 25%,
+    45% 50%, 52% 50%,
+    52% 75%, 60% 75%,
+    40% 100%, 45% 100%,
+    48% 75%, 48% 50%,
+    42% 50%, 48% 25%,
+    48% 0%
   );
-  animation: electricBolt 1.5s ease-out infinite;
-  filter: blur(2px);
-  box-shadow: 0 0 20px rgba(255, 214, 0, 0.8),
-              0 0 40px rgba(255, 235, 59, 0.6),
-              0 0 60px rgba(255, 255, 255, 0.4);
+  animation: electricBolt 1.2s ease-out forwards;
+  filter: blur(1px) drop-shadow(0 0 10px rgba(255, 235, 59, 0.9));
+  box-shadow: 0 0 30px rgba(255, 214, 0, 0.9),
+              0 0 60px rgba(255, 235, 59, 0.7),
+              0 0 90px rgba(255, 255, 255, 0.5);
 }
 
 /* Water Type - Wave shapes surging */
 .card-entry-effects.water .effect-element {
   position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 300px;
-  height: 100px;
+  left: 0;
+  top: 50%;
+  width: min(400px, 60vw);
+  height: min(120px, 20vh);
   background: linear-gradient(
     to top,
-    rgba(41, 182, 246, 0.8) 0%,
-    rgba(3, 169, 244, 0.6) 50%,
-    rgba(2, 136, 209, 0.4) 80%,
+    rgba(41, 182, 246, 0.9) 0%,
+    rgba(3, 169, 244, 0.7) 40%,
+    rgba(2, 136, 209, 0.5) 70%,
     transparent 100%
   );
-  border-radius: 50% 50% 0 0;
-  animation: waterWaves 2s ease-in-out infinite;
-  filter: blur(2px);
+  border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+  animation: waterWaves 1.8s ease-in-out forwards;
+  filter: blur(3px);
 }
 
 .card-entry-particles {
@@ -1107,7 +1127,7 @@ input[type="text"]:focus, input[type="number"]:focus {
   position: absolute;
   left: 50%;
   top: 50%;
-  font-size: 24px;
+  font-size: clamp(16px, 4vw, 24px);
   animation: particleBurst 1s ease-out forwards;
 }
 
@@ -1485,6 +1505,148 @@ input[type="text"]:focus, input[type="number"]:focus {
   text-align: center;
   word-break: keep-all;
   line-height: 1.2;
+}
+
+/* ── Leaderboard overlay ─────────────────────────────────────────────────── */
+.leaderboard-overlay {
+  align-items: flex-start;
+  overflow-y: auto;
+  padding: 20px 0;
+}
+.leaderboard-box {
+  position: relative;
+  background: linear-gradient(135deg, #1a0a2e, #0f3460);
+  border: 3px solid var(--gold);
+  border-radius: 20px;
+  padding: 32px 28px 28px;
+  max-width: 800px;
+  width: 94%;
+  margin: auto;
+  box-shadow: 0 20px 60px rgba(255,215,0,.3), 0 0 100px rgba(255,215,0,.1);
+  animation: pop-in .3s ease;
+}
+.leaderboard-title {
+  text-align: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: var(--gold);
+  margin: 0 0 8px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 20px rgba(255,215,0,.6);
+}
+.leaderboard-subtitle {
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255,255,255,.6);
+  margin: 0 0 24px;
+}
+.leaderboard-content {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.leaderboard-loading {
+  text-align: center;
+  color: rgba(255,255,255,.5);
+  padding: 40px;
+  font-size: 14px;
+}
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.leaderboard-table thead {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(135deg, #1a0a2e, #0f3460);
+  z-index: 10;
+}
+.leaderboard-table th {
+  padding: 12px 8px;
+  text-align: left;
+  font-size: 11px;
+  color: var(--gold);
+  font-weight: 700;
+  border-bottom: 2px solid rgba(255,215,0,.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.leaderboard-table th:first-child {
+  width: 60px;
+  text-align: center;
+}
+.leaderboard-table th:last-child {
+  text-align: right;
+}
+.leaderboard-table tbody tr {
+  transition: background .2s;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.leaderboard-table tbody tr:hover {
+  background: rgba(255,215,0,.08);
+}
+.leaderboard-table td {
+  padding: 14px 8px;
+  font-size: 13px;
+  color: rgba(255,255,255,.85);
+}
+.leaderboard-rank {
+  text-align: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+.leaderboard-rank.top-1 { color: #ffd700; text-shadow: 0 0 10px #ffd700; }
+.leaderboard-rank.top-2 { color: #c0c0c0; text-shadow: 0 0 8px #c0c0c0; }
+.leaderboard-rank.top-3 { color: #cd7f32; text-shadow: 0 0 8px #cd7f32; }
+.leaderboard-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.leaderboard-score {
+  text-align: right;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+.leaderboard-score.positive { color: #4caf50; }
+.leaderboard-score.negative { color: #f44336; }
+.leaderboard-games {
+  text-align: right;
+  font-size: 11px;
+  color: rgba(255,255,255,.5);
+}
+.btn-gold {
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #1a0a2e;
+  font-weight: 700;
+  border: 2px solid #ffd700;
+  box-shadow: 0 4px 15px rgba(255,215,0,.4);
+}
+.btn-gold:hover {
+  background: linear-gradient(135deg, #ffed4e, #ffd700);
+  box-shadow: 0 6px 20px rgba(255,215,0,.6);
+  transform: translateY(-2px);
+}
+.btn-leaderboard {
+  background: rgba(255,215,0,.15);
+  border: 2px solid var(--gold);
+  color: var(--gold);
+  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.btn-leaderboard:hover {
+  background: rgba(255,215,0,.25);
+  box-shadow: 0 0 15px rgba(255,215,0,.4);
+  transform: scale(1.1);
 }
 
 #showdown-title {
