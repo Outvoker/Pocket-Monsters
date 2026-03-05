@@ -1835,6 +1835,15 @@
       const currentSlider = volSliders.find(s => s) || { value: 0.15 };
       const targetVol = parseFloat(currentSlider.value);
       
+      // If volume is 0 (muted), just switch the source without playing
+      if (targetVol === 0) {
+        console.log('[BGM] Volume is 0 (muted), switching source but staying paused');
+        bgm.pause();
+        bgm.src = url;
+        bgm.volume = 0;
+        return;
+      }
+      
       // If BGM is not playing (failed to start or paused), try direct switch
       if (bgm.paused || !bgm.src) {
         console.log('[BGM] BGM not playing, attempting direct switch');
