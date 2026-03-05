@@ -635,6 +635,8 @@ input[type="text"]:focus, input[type="number"]:focus {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .my-info-bar {
@@ -2456,7 +2458,7 @@ input[type="text"]:focus, input[type="number"]:focus {
   .btn-lang { font-size: 10px; padding: 3px 8px; }
 
   .game-screen { overflow: hidden; }
-  .game-layout  { grid-template-rows: auto minmax(0,1fr) auto; height: 0; flex: 1; }
+  .game-layout  { grid-template-rows: auto minmax(0,1fr) minmax(auto, 45vh); height: 0; flex: 1; }
 
   .opponents-area { 
     padding: 4px 6px; 

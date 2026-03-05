@@ -388,8 +388,10 @@ function startGame(room) {
     for (const p of rp) p.hand.push(dealCard(room));
 
   const n = rp.length;
-  const sbIdx = (room.dealerIdx + 1) % n;
-  const bbIdx = (room.dealerIdx + 2) % n;
+  // Find dealer's position in the round players array
+  const dealerInRp = rp.findIndex(p => p.id === room.players[room.dealerIdx].id);
+  const sbIdx = (dealerInRp + 1) % n;
+  const bbIdx = (dealerInRp + 2) % n;
   postBlind(room, rp[sbIdx], room.smallBlind);
   postBlind(room, rp[bbIdx], room.bigBlind);
   room.currentBet = room.bigBlind;
@@ -408,7 +410,9 @@ function startBettingRound(room) {
   for (const p of room.players) p.bet = 0;
   const rp = room.roundPlayers();
   const n  = rp.length;
-  let firstRpIdx = (room.dealerIdx + 1) % n;
+  // Find dealer's position in the round players array
+  const dealerInRp = rp.findIndex(p => p.id === room.players[room.dealerIdx].id);
+  let firstRpIdx = (dealerInRp + 1) % n;
   for (let i = 0; i < n; i++) {
     const p = rp[firstRpIdx];
     if (!p.folded && !p.allIn) break;
@@ -654,10 +658,20 @@ function endGame(room, winners) {
       emitGameState(room);
       broadcastRoomList();
     } else {
-      room.dealerIdx = (room.dealerIdx + 1) % room.players.length;
-      // Skip spectators when advancing dealer
-      while (room.players[room.dealerIdx].spectator)
-        room.dealerIdx = (room.dealerIdx + 1) % room.players.length;
+      // Advance dealer to next non-spectator player
+      const nonSpectators = room.players.filter(p => !p.spectator);
+      if (nonSpectators.length === 0) {
+        // Safety check: if all are spectators, game shouldn't continue
+        room.phase = GL.PHASES.WAITING;
+        emitGameState(room);
+        return;
+      }
+      // Find current dealer in non-spectator list and advance
+      const currentDealer = room.players[room.dealerIdx];
+      const currentDealerInNonSpec = nonSpectators.findIndex(p => p.id === currentDealer.id);
+      const nextDealerInNonSpec = (currentDealerInNonSpec + 1) % nonSpectators.length;
+      const nextDealer = nonSpectators[nextDealerInNonSpec];
+      room.dealerIdx = room.players.findIndex(p => p.id === nextDealer.id);
       startGame(room);
     }
   }, totalDelay);

@@ -213,9 +213,9 @@ function checkStraight(uniqueValues, allValues) {
 }
 
 function checkAceLowStraight(values) {
-  // A(13)-2-3-4-5 straight
+  // A(13)-2-3-4-5 straight (values: 13,1,2,3,4)
   const set = new Set(values);
-  return set.has(13) && set.has(2) && set.has(3) && set.has(4) && set.has(5);
+  return set.has(13) && set.has(1) && set.has(2) && set.has(3) && set.has(4);
 }
 
 function sortByFrequency(valueCounts) {
