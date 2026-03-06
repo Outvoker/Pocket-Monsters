@@ -21,6 +21,7 @@ Thumbs.db
 *.swp
 *.swo
 .history/
+.windsurf/
 
 # Runtime
 *.pid

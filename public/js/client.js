@@ -385,7 +385,7 @@
     el.className = 'action-log-item';
     el.style.borderLeftColor = color;
     el.innerHTML = `<span class="al-icon">${icon}</span>
-      <span class="al-name">${isBot ? '🤖 ' : ''}${escHtml(name)}</span>
+      <span class="al-name">${isBot ? '🎮 ' : ''}${escHtml(name)}</span>
       <span class="al-label" style="color:${color}">${label}</span>${amountStr}`;
     actionFeed.prepend(el);
 
@@ -402,6 +402,27 @@
     // Show epic action announcement only for raise and allin
     if (action === 'raise' || action === 'allin') {
       showActionAnnouncement({ name, isBot, action, amount, labels });
+    }
+
+    // VFX: Screen shake + flash for allin
+    if (action === 'allin') {
+      triggerScreenShake();
+      triggerScreenFlash();
+    }
+
+    // VFX: Chip bet animation for raise/allin/call
+    if (action === 'raise' || action === 'allin' || action === 'call') {
+      // Find the player's DOM element to animate coins from
+      const oppSlots = document.querySelectorAll('.opponent-slot');
+      let sourceEl = null;
+      oppSlots.forEach(slot => {
+        const nameEl = slot.querySelector('.opp-name');
+        if (nameEl && nameEl.textContent.includes(name)) sourceEl = slot;
+      });
+      if (!sourceEl && name === gameState?.players.find(p => p.id === myId)?.name) {
+        sourceEl = $('my-chips');
+      }
+      if (sourceEl) animateChipBet(sourceEl);
     }
   }
 
@@ -423,7 +444,7 @@
 
     // Set player name
     const playerEl = announcement.querySelector('.action-announcement-player');
-    playerEl.textContent = (isBot ? '🤖 ' : '') + name;
+    playerEl.textContent = (isBot ? '🎮 ' : '') + name;
 
     // Set action text
     const textEl = announcement.querySelector('.action-announcement-text');
@@ -637,11 +658,26 @@
       $('my-chips').innerHTML   = `${me.chips} <span>${t('coins')}</span>`;
     }
 
+    // VFX: Phase transition effects
+    triggerPhaseTransition(phaseKey);
+
     renderCommunity(state);
     renderOpponents(state);
     renderMyHand(state, me);
     renderActionPanel(state, me);
     renderSidebar(state);
+
+    // VFX: Chip change animations
+    trackChipChanges(state);
+
+    // VFX: Active turn glow
+    applyTurnGlow(state, me);
+
+    // VFX: Streak highlights & rare hand highlights
+    if (me) {
+      applyStreakHighlight(state, me);
+      applyRareHandHighlight(state, me);
+    }
 
     if (state.finalChampion) {
       showFinalChampion(state);
@@ -810,7 +846,7 @@
       slot.innerHTML = `
         ${cardsHtml}
         <div class="opp-info">
-          <div class="opp-name">${p.isBot ? '🤖 ' : ''}${escHtml(p.name)}${isMe ? ' 👤' : ''}${statusHtml}</div>
+          <div class="opp-name">${p.isBot ? '🎮 ' : ''}${escHtml(p.name)}${isMe ? ' 👤' : ''}${statusHtml}</div>
           <div class="opp-chips">${p.chips} ${t('coins')}</div>
           ${betHtml}
           ${p.bestHand ? `<div style="font-size:10px;color:#aaa">${escHtml(p.bestHand.rankLabel)}</div>` : ''}
@@ -997,7 +1033,7 @@
       const div = document.createElement('div');
       div.className = `sidebar-player ${p.folded ? 'folded' : ''} ${isActive ? 'is-turn' : ''}`;
       div.innerHTML = `
-        <div class="sidebar-player-name">${isDealer ? '🎖️ ' : ''}${p.isBot ? '🤖 ' : ''}${escHtml(p.name)}${p.id === myId ? ' (Me)' : ''}</div>
+        <div class="sidebar-player-name">${isDealer ? '🎖️ ' : ''}${p.isBot ? '🎮 ' : ''}${escHtml(p.name)}${p.id === myId ? ' (Me)' : ''}</div>
         <div class="sidebar-player-chips">${p.chips} ${t('coins')}</div>
         ${p.bet ? `<div style="font-size:10px;color:#78909c">${p.bet}</div>` : ''}`;
       sb.appendChild(div);
@@ -1029,7 +1065,7 @@
     let currentBattleIndex = 0;
     const BATTLE_DURATION = 8000; // 8 seconds per battle (slower)
     const PAUSE_BETWEEN = 1000;   // 1 second pause between battles
-    const BANNER_DURATION = 2000; // 2 seconds for banner
+    const BANNER_DURATION = 3200; // 1.2s pokeball + 2s text banner
     
     function playNextBattle() {
       if (currentBattleIndex >= bracket.length) {
@@ -1057,21 +1093,46 @@
   function showBattleStartBanner() {
     const banner = $('battle-start-banner');
     if (!banner) return;
-    
+
+    const content = banner.querySelector('.battle-banner-content');
+
+    // Phase 0: Show dark overlay with pokeball spin-enlarge
     banner.classList.remove('hidden');
-    
-    // Play fight sound effect
-    const fightSfx = $('fight-sfx');
-    if (fightSfx) {
-      fightSfx.currentTime = 0;
-      fightSfx.volume = 0.7;
-      fightSfx.play().catch(e => {});
-    }
-    
-    // Hide banner after 2 seconds
+    if (content) content.style.display = 'none';
+
+    const pokeball = createPokeballVFX();
+    pokeball.style.position = 'fixed';
+    pokeball.style.zIndex = '210';
+    banner.appendChild(pokeball);
+    requestAnimationFrame(() => pokeball.classList.add('pokeball-battle-anim'));
+
+    // Flash ring when pokeball reaches max size (~55% of 1.2s)
     setTimeout(() => {
-      banner.classList.add('hidden');
-    }, 2000);
+      const ring = document.createElement('div');
+      ring.className = 'pokeball-flash-ring';
+      ring.style.position = 'fixed';
+      ring.style.zIndex = '211';
+      banner.appendChild(ring);
+      ring.addEventListener('animationend', () => ring.remove());
+    }, 660);
+
+    // Phase 1: After pokeball fades (1.2s), show text banner + sound
+    setTimeout(() => {
+      pokeball.remove();
+      if (content) content.style.display = '';
+
+      const fightSfx = $('fight-sfx');
+      if (fightSfx) {
+        fightSfx.currentTime = 0;
+        fightSfx.volume = 0.7;
+        fightSfx.play().catch(e => {});
+      }
+
+      // Hide banner after 2 more seconds of text display
+      setTimeout(() => {
+        banner.classList.add('hidden');
+      }, 2000);
+    }, 1200);
   }
   
   function showTournamentBattle(battle, community) {
@@ -1090,8 +1151,11 @@
     // Clear previous result and animations
     resultEl.textContent = '';
     resultEl.className = 'tournament-result';
-    p1El.classList.remove('tournament-winner', 'tournament-loser', 'tournament-attacking');
-    p2El.classList.remove('tournament-winner', 'tournament-loser', 'tournament-attacking');
+    p1El.classList.remove('tournament-winner', 'tournament-loser', 'tournament-attacking', 'loser-fade');
+    p2El.classList.remove('tournament-winner', 'tournament-loser', 'tournament-attacking', 'loser-fade');
+
+    // VFX cleanup: remove leftover VFX elements from previous battle
+    tournamentOverlay.querySelectorAll('.winner-light-pillar, .pillar-particle, .collision-wave, .collision-ray').forEach(el => el.remove());
     
     // Render player 1 and 2 with cards (no animation classes yet)
     renderTournamentPlayer(p1El, battle.player1, community, false);
@@ -1113,6 +1177,13 @@
       
       p1El.classList.add('tournament-attacking');
       p2El.classList.add('tournament-attacking');
+
+      // VFX: Screen shake on collision
+      triggerScreenShake();
+
+      // VFX: Collision shockwave at center
+      const tournBox = document.querySelector('.tournament-box');
+      if (tournBox) addCollisionShockwave(tournBox);
     }, 3500);
     
     // Phase 4: Apply winner/loser effects (at 4.5s)
@@ -1124,16 +1195,25 @@
       if (battle.winnerId === battle.player1.id) {
         p1El.classList.add('tournament-winner');
         p2El.classList.add('tournament-loser');
+        // VFX: Loser fade + winner light pillar
+        p2El.classList.add('loser-fade');
+        addWinnerLightPillar(p1El);
       } else {
         p2El.classList.add('tournament-winner');
         p1El.classList.add('tournament-loser');
+        // VFX: Loser fade + winner light pillar
+        p1El.classList.add('loser-fade');
+        addWinnerLightPillar(p2El);
       }
+
+      // VFX: Screen flash on winner reveal
+      triggerScreenFlash();
     }, 4500);
     
     // Phase 5: Show result text after 3 second pause (at 7.5s)
     setTimeout(() => {
       const winner = battle.winnerId === battle.player1.id ? battle.player1 : battle.player2;
-      const winnerName = winner.isBot ? '🤖 ' + winner.name : winner.name;
+      const winnerName = winner.isBot ? '🎮 ' + winner.name : winner.name;
       resultEl.textContent = lang === 'zh' ? `🏆 ${winnerName} 胜出！` : `🏆 ${winnerName} Wins!`;
       resultEl.classList.add('tournament-result-show');
     }, 7500);
@@ -1160,7 +1240,7 @@
     playerEl.classList.remove('tournament-winner', 'tournament-loser');
     
     // Player name
-    const displayName = player.isBot ? '🤖 ' + player.name : player.name;
+    const displayName = player.isBot ? '🎮 ' + player.name : player.name;
     nameEl.textContent = displayName;
     
     // Get best 5 cards for highlighting (but don't apply classes yet)
@@ -1336,7 +1416,7 @@
         
         html += `<div class="round-result-row${isWinner ? ' is-winner' : ''}${foldedClass}">
           <span class="rr-place">${placeStr}</span>
-          <span class="rr-name">${r.isBot ? '🤖 ' : ''}${escHtml(r.name)}${isWinner ? ' 🏆' : ''}${rankStr}</span>
+          <span class="rr-name">${r.isBot ? '🎮 ' : ''}${escHtml(r.name)}${isWinner ? ' 🏆' : ''}${rankStr}</span>
           <span class="rr-delta ${deltaClass}">${deltaStr}</span>
           <span class="rr-chips">= ${r.chips} ${t('coins')}</span>
         </div>`;
@@ -1356,6 +1436,34 @@
     showdownContent.innerHTML = html;
 
     requestAnimationFrame(() => spawnSparkles(overlayBox));
+
+    // VFX: Add winner light pillars to winner sections
+    requestAnimationFrame(() => {
+      showdownContent.querySelectorAll('.showdown-winner').forEach(el => {
+        addWinnerLightPillar(el);
+      });
+    });
+
+    // VFX: Track win streaks
+    const winnerIds = new Set(winners.map(w => w.id));
+    state.players.forEach(p => {
+      if (winnerIds.has(p.id)) {
+        winStreaks[p.id] = (winStreaks[p.id] || 0) + 1;
+      } else {
+        winStreaks[p.id] = 0;
+      }
+    });
+
+    // VFX: Play skill effect based on winner's dominant type
+    if (winners.length > 0 && winners[0].bestHand && winners[0].bestHand.bestFive) {
+      const types = winners[0].bestHand.bestFive.map(c => c.type);
+      const typeCounts = {};
+      types.forEach(t => { typeCounts[t] = (typeCounts[t] || 0) + 1; });
+      const dominantType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+      if (dominantType) {
+        setTimeout(() => playSkillEffect(dominantType[0]), 500);
+      }
+    }
   }
 
   function hideShowdown() {
@@ -1365,7 +1473,7 @@
     showdownOverlay.classList.remove('showdown-epic');
     const overlayBox = showdownOverlay.querySelector('.overlay-box');
     if (overlayBox) overlayBox.classList.remove('showdown-epic-box');
-    showdownOverlay.querySelectorAll('.sparkle').forEach(s => s.remove());
+    showdownOverlay.querySelectorAll('.sparkle, .winner-light-pillar, .pillar-particle').forEach(s => s.remove());
     clearInterval(countdownTimer);
     // Don't clear tracking sets here - they should only be cleared when DOM is cleared
     // renderedCommunityKeys and renderedMyHandKeys are cleared in their respective render functions
@@ -1396,6 +1504,12 @@
     ).join('');
 
     requestAnimationFrame(() => spawnSparkles(champOverlay.querySelector('.champ-box')));
+
+    // VFX: Enhanced champion overlay with halos, bubbles, gradient text
+    requestAnimationFrame(() => enhanceChampionOverlay(champOverlay.querySelector('.champ-box')));
+
+    // VFX: Screen flash for champion reveal
+    triggerScreenFlash();
 
     $('champ-back-btn').addEventListener('click', () => {
       if (socket) socket.disconnect();
@@ -1495,6 +1609,8 @@
   }
 
   // ─── Card Entry Animation System ──────────────────────────────────────────────
+  const POKEBALL_ENTRY_DURATION = 800; // ms for pokeball phase
+
   function playCardEntryAnimation(card, targetContainer, targetIndex, isHand = false) {
     const overlay = $('card-entry-overlay');
     const stage = $('card-entry-stage');
@@ -1503,207 +1619,189 @@
     
     if (!overlay || !stage) return null;
 
-    // Play type-specific sound effect
-    playTypeSound(card.type);
+    // ── Phase 0: Pokeball spin-open ──────────────────────────────────
+    // Hide the decorative arena pokeball so it doesn't show through overlay
+    const arenaPokeball = document.querySelector('.arena-pokeball');
+    if (arenaPokeball) arenaPokeball.style.visibility = 'hidden';
 
-    // Create card element for center stage
-    const cardEl = makeMonEl(card, false, false, 0);
-    cardEl.style.opacity = '0';
-    cardEl.style.transition = 'none';
-    
-    // Show overlay
     overlay.classList.remove('hidden');
-    stage.appendChild(cardEl);
-    
-    // Set effect color and type based on card type
-    const typeColors = {
-      fire: '#FF6B35',
-      water: '#29B6F6',
-      grass: '#66BB6A',
-      electric: '#FFD600'
-    };
-    effectsContainer.style.color = typeColors[card.type] || '#FFD700';
-    effectsContainer.className = `card-entry-effects ${card.type}`;
-    
-    // Create type-specific large-scale effects
+    stage.innerHTML = '';
     effectsContainer.innerHTML = '';
-    
-    // Get viewport dimensions for responsive positioning
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    
-    if (card.type === 'fire') {
-      // Fire: Row of flames rising from bottom simultaneously
-      const flameCount = Math.min(12, Math.floor(vw / 80));
-      for (let i = 0; i < flameCount; i++) {
-        const flame = document.createElement('div');
-        flame.className = 'effect-element';
-        // Spread flames evenly across bottom (80% of screen width)
-        const spreadWidth = vw * 0.8;
-        const spacing = spreadWidth / (flameCount - 1);
-        const offset = (i * spacing) - (spreadWidth / 2);
-        flame.style.left = `calc(50% + ${offset}px)`;
-        flame.style.animationDuration = `${1.8 + Math.random() * 0.6}s`;
-        flame.style.animationDelay = `${Math.random() * 0.2}s`;
-        flame.style.transform = `translate(-50%, 0) scale(${0.8 + Math.random() * 0.4})`;
-        effectsContainer.appendChild(flame);
-      }
-    } else if (card.type === 'grass') {
-      // Grass: Leaves randomly distributed across entire screen, falling continuously
-      const leafCount = Math.min(60, Math.floor((vw * vh) / 6000));
-      for (let i = 0; i < leafCount; i++) {
-        const leaf = document.createElement('div');
-        leaf.className = 'effect-element';
-        // Random horizontal position across full screen width
-        const xOffset = (Math.random() - 0.5) * vw * 0.98;
-        leaf.style.left = `calc(50% + ${xOffset}px)`;
-        // Random vertical position across entire screen height (including above and on screen)
-        const yStart = -40 + Math.random() * 140; // From -40vh to 100vh (covers whole screen)
-        leaf.style.top = `${yStart}vh`;
-        leaf.style.animationDuration = `${2.5 + Math.random() * 1.5}s`;
-        leaf.style.animationDelay = `${Math.random() * 0.2}s`;
-        // Random size, rotation, and horizontal drift
-        const scale = 0.5 + Math.random() * 0.7;
-        const rotation = Math.random() * 360;
-        const drift = (Math.random() - 0.5) * 120; // Horizontal drift during fall
-        leaf.style.setProperty('--drift', `${drift}px`);
-        leaf.style.transform = `translate(-50%, 0) scale(${scale}) rotate(${rotation}deg)`;
-        effectsContainer.appendChild(leaf);
-      }
-    } else if (card.type === 'electric') {
-      // Electric: Lightning bolts striking from top to bottom in zigzag pattern
-      const boltCount = Math.min(8, Math.floor(vw / 100) + 2);
-      for (let i = 0; i < boltCount; i++) {
-        const bolt = document.createElement('div');
-        bolt.className = 'effect-element';
-        // Spread bolts across screen
-        const spreadWidth = vw * 0.7;
-        const spacing = spreadWidth / (boltCount - 1);
-        const offset = (i * spacing) - (spreadWidth / 2);
-        bolt.style.left = `calc(50% + ${offset}px)`;
-        bolt.style.animationDelay = `${i * 0.15 + Math.random() * 0.1}s`;
-        // Random slight rotation for variety
-        bolt.style.transform = `translateX(-50%) rotate(${(Math.random() - 0.5) * 8}deg)`;
-        effectsContainer.appendChild(bolt);
-      }
-    } else if (card.type === 'water') {
-      // Water: Waves sweeping from left to right
-      const waveCount = 6;
-      for (let i = 0; i < waveCount; i++) {
-        const wave = document.createElement('div');
-        wave.className = 'effect-element';
-        // Stagger waves vertically for depth effect
-        const verticalOffset = (i - waveCount / 2) * (vh * 0.08);
-        wave.style.top = `calc(50% + ${verticalOffset}px)`;
-        wave.style.animationDelay = `${i * 0.15}s`;
-        wave.style.animationDuration = `${1.6 + Math.random() * 0.4}s`;
-        wave.style.opacity = `${0.7 - i * 0.08}`;
-        effectsContainer.appendChild(wave);
-      }
-    }
-    
-    // Create particles
-    const particleEmojis = {
-      fire: ['🔥', '✨', '💫', '⭐', '🌟'],
-      water: ['💧', '💦', '✨', '💫', '🌊'],
-      grass: ['🌿', '🍃', '✨', '💫', '🌱'],
-      electric: ['⚡', '✨', '💫', '⭐', '🌟']
-    };
-    const emojis = particleEmojis[card.type] || ['✨', '💫', '⭐'];
-    
     particlesContainer.innerHTML = '';
-    // Use viewport-relative particle burst distance
-    const baseDistance = Math.min(vw, vh) * 0.25;
-    for (let i = 0; i < 20; i++) {
-      const particle = document.createElement('div');
-      particle.className = 'card-entry-particle';
-      const angle = (i / 20) * Math.PI * 2;
-      const distance = baseDistance + Math.random() * (baseDistance * 0.4);
-      const tx = Math.cos(angle) * distance;
-      const ty = Math.sin(angle) * distance;
-      particle.style.setProperty('--tx', `${tx}px`);
-      particle.style.setProperty('--ty', `${ty}px`);
-      particle.style.animationDelay = `${i * 30}ms`;
-      particle.textContent = emojis[i % emojis.length];
-      particlesContainer.appendChild(particle);
-    }
-    
-    // Trigger animation
-    requestAnimationFrame(() => {
-      cardEl.style.opacity = '1';
-    });
-    
-    // After center animation, move to position
+
+    const pokeball = createPokeballVFX();
+    stage.appendChild(pokeball);
+    requestAnimationFrame(() => pokeball.classList.add('pokeball-entry-anim'));
+
+    // Flash ring at ~50% of pokeball anim
+    setTimeout(() => {
+      const ring = document.createElement('div');
+      ring.className = 'pokeball-flash-ring';
+      stage.appendChild(ring);
+      ring.addEventListener('animationend', () => ring.remove());
+    }, POKEBALL_ENTRY_DURATION * 0.5);
+
+    // ── Phase 1 (after pokeball fades): Card reveal + type effects ───
     return new Promise(resolve => {
       setTimeout(() => {
-        // Get current card position (center of screen)
-        const cardRect = cardEl.getBoundingClientRect();
-        const currentCenterX = cardRect.left + cardRect.width / 2;
-        const currentCenterY = cardRect.top + cardRect.height / 2;
-        
-        // Get target container position
-        const targetRect = targetContainer.getBoundingClientRect();
-        
-        // Calculate the center of the target container
-        const containerCenterX = targetRect.left + targetRect.width / 2;
-        const containerCenterY = targetRect.top + targetRect.height / 2;
-        
-        // Calculate card dimensions at normal scale (110px for community, 108px for hand)
-        const cardWidth = isHand ? 108 : 110;
-        const gap = 10;
-        
-        // Calculate total width of all cards with gaps
-        const totalCards = targetContainer.querySelectorAll('.poke-mon, .poke-slot').length;
-        const totalWidth = totalCards * cardWidth + (totalCards - 1) * gap;
-        
-        // Calculate starting X position to center all cards
-        const startX = containerCenterX - totalWidth / 2;
-        
-        // Calculate final center position for this specific card
-        const finalCenterX = startX + targetIndex * (cardWidth + gap) + cardWidth / 2;
-        const finalCenterY = containerCenterY;
-        
-        // Calculate how much to move from current position
-        const deltaX = finalCenterX - currentCenterX;
-        const deltaY = finalCenterY - currentCenterY;
-        
-        // Enable transition and move to final position
-        cardEl.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
-        // Keep the translate(-50%, -50%) from CSS animation, just change position and scale
-        cardEl.style.left = `calc(50% + ${deltaX}px)`;
-        cardEl.style.top = `calc(50% + ${deltaY}px)`;
-        cardEl.style.transform = 'translate(-50%, -50%) scale(0.4)';
-        
-        // After move animation completes
-        setTimeout(() => {
-          // Hide overlay
-          overlay.classList.add('hidden');
-          stage.innerHTML = '';
-          particlesContainer.innerHTML = '';
-          
-          // Calculate if this card is in best hand
-          const me = gameState?.players.find(p => p.id === myId);
-          const totalCards = (me?.hand?.length || 0) + (gameState?.community?.length || 0);
-          const shouldHighlight = totalCards >= 5;
-          const bestKeys = shouldHighlight && me?.bestHand?.bestFive
-            ? new Set(me.bestHand.bestFive.map(c => `${c.type}-${c.id}`))
-            : new Set();
-          const key = `${card.type}-${card.id}`;
-          const inBest = bestKeys.has(key);
-          
-          // Add card to actual target container
-          const finalCard = makeMonEl(card, inBest, false, 0);
-          finalCard.dataset.cardKey = key;
-          
-          if (targetContainer.children[targetIndex]) {
-            targetContainer.replaceChild(finalCard, targetContainer.children[targetIndex]);
-          } else {
-            targetContainer.appendChild(finalCard);
+        pokeball.remove();
+        playTypeSound(card.type);
+
+        const cardEl = makeMonEl(card, false, false, 0);
+        cardEl.style.opacity = '0';
+        cardEl.style.transition = 'none';
+        stage.appendChild(cardEl);
+
+        const typeColors = { fire: '#FF6B35', water: '#29B6F6', grass: '#66BB6A', electric: '#FFD600' };
+        effectsContainer.style.color = typeColors[card.type] || '#FFD700';
+        effectsContainer.className = `card-entry-effects ${card.type}`;
+        effectsContainer.innerHTML = '';
+
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        if (card.type === 'fire') {
+          const flameCount = Math.min(12, Math.floor(vw / 80));
+          for (let i = 0; i < flameCount; i++) {
+            const flame = document.createElement('div');
+            flame.className = 'effect-element';
+            const spreadWidth = vw * 0.8;
+            const spacing = spreadWidth / (flameCount - 1);
+            const offset = (i * spacing) - (spreadWidth / 2);
+            flame.style.left = `calc(50% + ${offset}px)`;
+            flame.style.animationDuration = `${1.8 + Math.random() * 0.6}s`;
+            flame.style.animationDelay = `${Math.random() * 0.2}s`;
+            flame.style.transform = `translate(-50%, 0) scale(${0.8 + Math.random() * 0.4})`;
+            effectsContainer.appendChild(flame);
           }
-          
-          resolve();
-        }, 650);
-      }, 1200);
+        } else if (card.type === 'grass') {
+          const leafCount = Math.min(60, Math.floor((vw * vh) / 6000));
+          for (let i = 0; i < leafCount; i++) {
+            const leaf = document.createElement('div');
+            leaf.className = 'effect-element';
+            const xOffset = (Math.random() - 0.5) * vw * 0.98;
+            leaf.style.left = `calc(50% + ${xOffset}px)`;
+            const yStart = -40 + Math.random() * 140;
+            leaf.style.top = `${yStart}vh`;
+            leaf.style.animationDuration = `${2.5 + Math.random() * 1.5}s`;
+            leaf.style.animationDelay = `${Math.random() * 0.2}s`;
+            const scale = 0.5 + Math.random() * 0.7;
+            const rotation = Math.random() * 360;
+            const drift = (Math.random() - 0.5) * 120;
+            leaf.style.setProperty('--drift', `${drift}px`);
+            leaf.style.transform = `translate(-50%, 0) scale(${scale}) rotate(${rotation}deg)`;
+            effectsContainer.appendChild(leaf);
+          }
+        } else if (card.type === 'electric') {
+          const boltCount = Math.min(8, Math.floor(vw / 100) + 2);
+          for (let i = 0; i < boltCount; i++) {
+            const bolt = document.createElement('div');
+            bolt.className = 'effect-element';
+            const spreadWidth = vw * 0.7;
+            const spacing = spreadWidth / (boltCount - 1);
+            const offset = (i * spacing) - (spreadWidth / 2);
+            bolt.style.left = `calc(50% + ${offset}px)`;
+            bolt.style.animationDelay = `${i * 0.15 + Math.random() * 0.1}s`;
+            bolt.style.transform = `translateX(-50%) rotate(${(Math.random() - 0.5) * 8}deg)`;
+            effectsContainer.appendChild(bolt);
+          }
+        } else if (card.type === 'water') {
+          const waveCount = 6;
+          for (let i = 0; i < waveCount; i++) {
+            const wave = document.createElement('div');
+            wave.className = 'effect-element';
+            const verticalOffset = (i - waveCount / 2) * (vh * 0.08);
+            wave.style.top = `calc(50% + ${verticalOffset}px)`;
+            wave.style.animationDelay = `${i * 0.15}s`;
+            wave.style.animationDuration = `${1.6 + Math.random() * 0.4}s`;
+            wave.style.opacity = `${0.7 - i * 0.08}`;
+            effectsContainer.appendChild(wave);
+          }
+        }
+
+        const particleEmojis = {
+          fire: ['🔥', '✨', '💫', '⭐', '🌟'],
+          water: ['💧', '💦', '✨', '💫', '🌊'],
+          grass: ['🌿', '🍃', '✨', '💫', '🌱'],
+          electric: ['⚡', '✨', '💫', '⭐', '🌟']
+        };
+        const emojis = particleEmojis[card.type] || ['✨', '💫', '⭐'];
+
+        particlesContainer.innerHTML = '';
+        const baseDistance = Math.min(vw, vh) * 0.25;
+        for (let i = 0; i < 20; i++) {
+          const particle = document.createElement('div');
+          particle.className = 'card-entry-particle';
+          const angle = (i / 20) * Math.PI * 2;
+          const distance = baseDistance + Math.random() * (baseDistance * 0.4);
+          const tx = Math.cos(angle) * distance;
+          const ty = Math.sin(angle) * distance;
+          particle.style.setProperty('--tx', `${tx}px`);
+          particle.style.setProperty('--ty', `${ty}px`);
+          particle.style.animationDelay = `${i * 30}ms`;
+          particle.textContent = emojis[i % emojis.length];
+          particlesContainer.appendChild(particle);
+        }
+
+        requestAnimationFrame(() => { cardEl.style.opacity = '1'; });
+
+        // ── Phase 2: Move card to final position ───
+        setTimeout(() => {
+          const cardRect = cardEl.getBoundingClientRect();
+          const currentCenterX = cardRect.left + cardRect.width / 2;
+          const currentCenterY = cardRect.top + cardRect.height / 2;
+
+          const targetRect = targetContainer.getBoundingClientRect();
+          const containerCenterX = targetRect.left + targetRect.width / 2;
+          const containerCenterY = targetRect.top + targetRect.height / 2;
+
+          const cardWidth = isHand ? 108 : 110;
+          const gap = 10;
+          const totalCards = targetContainer.querySelectorAll('.poke-mon, .poke-slot').length;
+          const totalWidth = totalCards * cardWidth + (totalCards - 1) * gap;
+          const startX = containerCenterX - totalWidth / 2;
+          const finalCenterX = startX + targetIndex * (cardWidth + gap) + cardWidth / 2;
+          const finalCenterY = containerCenterY;
+
+          const deltaX = finalCenterX - currentCenterX;
+          const deltaY = finalCenterY - currentCenterY;
+
+          cardEl.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+          cardEl.style.left = `calc(50% + ${deltaX}px)`;
+          cardEl.style.top = `calc(50% + ${deltaY}px)`;
+          cardEl.style.transform = 'translate(-50%, -50%) scale(0.4)';
+
+          setTimeout(() => {
+            overlay.classList.add('hidden');
+            stage.innerHTML = '';
+            particlesContainer.innerHTML = '';
+
+            // Restore arena pokeball visibility
+            const arenaPB = document.querySelector('.arena-pokeball');
+            if (arenaPB) arenaPB.style.visibility = '';
+
+            const me = gameState?.players.find(p => p.id === myId);
+            const totalCards2 = (me?.hand?.length || 0) + (gameState?.community?.length || 0);
+            const shouldHighlight = totalCards2 >= 5;
+            const bestKeys = shouldHighlight && me?.bestHand?.bestFive
+              ? new Set(me.bestHand.bestFive.map(c => `${c.type}-${c.id}`))
+              : new Set();
+            const key = `${card.type}-${card.id}`;
+            const inBest = bestKeys.has(key);
+
+            const finalCard = makeMonEl(card, inBest, false, 0);
+            finalCard.dataset.cardKey = key;
+
+            if (targetContainer.children[targetIndex]) {
+              targetContainer.replaceChild(finalCard, targetContainer.children[targetIndex]);
+            } else {
+              targetContainer.appendChild(finalCard);
+            }
+
+            resolve();
+          }, 650);
+        }, 1200);
+      }, POKEBALL_ENTRY_DURATION);
     });
   }
 
@@ -2060,6 +2158,426 @@
     // Expose renderLeaderboard globally for socket handler
     window.renderLeaderboardData = renderLeaderboard;
   })();
+
+  // ─── VFX System ──────────────────────────────────────────────────────────────
+
+  // Creates a standalone pokeball DOM element for VFX animations
+  function createPokeballVFX() {
+    const pb = document.createElement('div');
+    pb.className = 'pokeball-vfx';
+    pb.innerHTML = '<div class="pokeball-vfx-top"></div><div class="pokeball-vfx-bottom"></div><div class="pokeball-vfx-mid"></div><div class="pokeball-vfx-btn"></div>';
+    return pb;
+  }
+
+  let vfxShakeDebounce = false;
+  let previousChips = {};   // track per-player chips for chip animations
+  let winStreaks = {};       // track per-player win streaks
+
+  // 2. Screen Shake & Flash
+  function triggerScreenShake() {
+    if (vfxShakeDebounce) return;
+    vfxShakeDebounce = true;
+    const gameScreen = $('game-screen');
+    if (gameScreen) {
+      gameScreen.classList.add('screen-shaking');
+      gameScreen.addEventListener('animationend', () => {
+        gameScreen.classList.remove('screen-shaking');
+      }, { once: true });
+    }
+    setTimeout(() => { vfxShakeDebounce = false; }, 800);
+  }
+
+  function triggerScreenFlash() {
+    const flashEl = $('screen-flash');
+    if (!flashEl) return;
+    flashEl.classList.remove('hidden');
+    // Force reflow to restart animation
+    flashEl.style.animation = 'none';
+    flashEl.offsetHeight;
+    flashEl.style.animation = '';
+    flashEl.addEventListener('animationend', () => {
+      flashEl.classList.add('hidden');
+    }, { once: true });
+  }
+
+  // 3. Type Skill Effects (full-screen attribute effects)
+  function playSkillEffect(type) {
+    const overlay = $('skill-effect-overlay');
+    if (!overlay) return;
+    overlay.innerHTML = '';
+
+    if (type === 'fire') {
+      // Fire Vortex: flames spiraling upward
+      for (let i = 0; i < 15; i++) {
+        const p = document.createElement('div');
+        p.className = 'skill-fire-particle';
+        p.style.left = (10 + Math.random() * 80) + '%';
+        p.style.animationDelay = (Math.random() * 0.5) + 's';
+        p.style.animationDuration = (1.5 + Math.random() * 0.8) + 's';
+        overlay.appendChild(p);
+        p.addEventListener('animationend', () => p.remove());
+      }
+    } else if (type === 'water') {
+      // Water Cannon: streams from both sides + splash
+      for (let i = 0; i < 3; i++) {
+        const left = document.createElement('div');
+        left.className = 'skill-water-particle from-left';
+        left.style.marginTop = ((i - 1) * 40) + 'px';
+        left.style.animationDelay = (i * 0.15) + 's';
+        overlay.appendChild(left);
+        left.addEventListener('animationend', () => left.remove());
+
+        const right = document.createElement('div');
+        right.className = 'skill-water-particle from-right';
+        right.style.marginTop = ((i - 1) * 40) + 'px';
+        right.style.animationDelay = (i * 0.15) + 's';
+        overlay.appendChild(right);
+        right.addEventListener('animationend', () => right.remove());
+      }
+      // Splash at center
+      const splash = document.createElement('div');
+      splash.className = 'skill-water-splash';
+      overlay.appendChild(splash);
+      splash.addEventListener('animationend', () => splash.remove());
+    } else if (type === 'grass') {
+      // Leaf Storm: leaves converging to center then exploding out
+      for (let i = 0; i < 20; i++) {
+        const leaf = document.createElement('div');
+        leaf.className = 'skill-grass-particle';
+        const angle = (i / 20) * Math.PI * 2;
+        const dist = 300 + Math.random() * 200;
+        leaf.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
+        leaf.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
+        leaf.style.animationDelay = (Math.random() * 0.3) + 's';
+        overlay.appendChild(leaf);
+        leaf.addEventListener('animationend', () => leaf.remove());
+      }
+    } else if (type === 'electric') {
+      // Thunderbolt: lightning bolts + energy ball
+      for (let i = 0; i < 5; i++) {
+        const bolt = document.createElement('div');
+        bolt.className = 'skill-electric-bolt';
+        bolt.style.left = (15 + i * 17) + '%';
+        bolt.style.animationDelay = (i * 0.15) + 's';
+        overlay.appendChild(bolt);
+        bolt.addEventListener('animationend', () => bolt.remove());
+      }
+      const ball = document.createElement('div');
+      ball.className = 'skill-electric-ball';
+      overlay.appendChild(ball);
+      ball.addEventListener('animationend', () => ball.remove());
+    }
+  }
+
+  // 4. Phase Transition Effects
+  let previousPhaseForTransition = null;
+  function triggerPhaseTransition(newPhase) {
+    if (!previousPhaseForTransition || previousPhaseForTransition === newPhase) {
+      previousPhaseForTransition = newPhase;
+      return;
+    }
+    previousPhaseForTransition = newPhase;
+
+    // Only animate for game phases (not waiting)
+    if (newPhase === 'waiting' || newPhase === 'preflop') return;
+
+    // Pokeball spin animation
+    const pokeball = document.querySelector('.arena-pokeball');
+    if (pokeball) {
+      const cls = (newPhase === 'river' || newPhase === 'showdown')
+        ? 'pokeball-transitioning-strong' : 'pokeball-transitioning';
+      pokeball.classList.add(cls);
+      pokeball.addEventListener('animationend', () => pokeball.classList.remove(cls), { once: true });
+    }
+
+    // Expanding ring from pokeball center
+    const arenaCenter = document.querySelector('.arena-center');
+    if (arenaCenter) {
+      const ring = document.createElement('div');
+      ring.className = 'phase-ring';
+      arenaCenter.appendChild(ring);
+      ring.addEventListener('animationend', () => ring.remove());
+
+      // Energy lines
+      for (let i = 0; i < 4; i++) {
+        const line = document.createElement('div');
+        line.className = 'phase-energy-line';
+        line.style.width = (100 + Math.random() * 100) + 'px';
+        line.style.top = (30 + Math.random() * 40) + '%';
+        line.style.left = (Math.random() * 80) + '%';
+        line.style.animationDelay = (i * 0.1) + 's';
+        arenaCenter.appendChild(line);
+        line.addEventListener('animationend', () => line.remove());
+      }
+    }
+
+    // Phase banner bounce
+    const phaseBanner = $('phase-banner');
+    if (phaseBanner) {
+      phaseBanner.classList.add('phase-banner-animating');
+      setTimeout(() => phaseBanner.classList.remove('phase-banner-animating'), 600);
+    }
+
+    // Phase flash
+    const flashEl = $('phase-flash');
+    if (flashEl) {
+      flashEl.classList.remove('hidden');
+      flashEl.style.animation = 'none';
+      flashEl.offsetHeight;
+      flashEl.style.animation = '';
+      flashEl.addEventListener('animationend', () => flashEl.classList.add('hidden'), { once: true });
+    }
+  }
+
+  // 5. Chip Animations
+  function animateChipWin(targetEl, count) {
+    const layer = $('chip-anim-layer');
+    if (!layer || !targetEl) return;
+    const rect = targetEl.getBoundingClientRect();
+    const coins = Math.min(count, 12);
+    for (let i = 0; i < coins; i++) {
+      const coin = document.createElement('div');
+      coin.className = 'coin-particle';
+      coin.textContent = '🪙';
+      const fromX = (Math.random() - 0.5) * window.innerWidth * 0.6;
+      const fromY = -100 - Math.random() * 200;
+      const toX = rect.left + rect.width / 2;
+      const toY = rect.top + rect.height / 2;
+      coin.style.setProperty('--from-x', fromX + 'px');
+      coin.style.setProperty('--from-y', fromY + 'px');
+      coin.style.setProperty('--to-x', toX + 'px');
+      coin.style.setProperty('--to-y', toY + 'px');
+      coin.style.setProperty('--duration', (0.6 + Math.random() * 0.4) + 's');
+      coin.style.animationDelay = (i * 0.08) + 's';
+      layer.appendChild(coin);
+      coin.addEventListener('animationend', () => coin.remove());
+    }
+  }
+
+  function animateChipLoss(sourceEl, amount) {
+    const layer = $('chip-anim-layer');
+    if (!layer || !sourceEl) return;
+    const rect = sourceEl.getBoundingClientRect();
+    const shards = Math.min(Math.ceil(amount / 50), 10);
+    const colors = ['#ffd700', '#ffb300', '#ff8f00', '#c6a300', '#e6be00'];
+    for (let i = 0; i < shards; i++) {
+      const shard = document.createElement('div');
+      shard.className = 'chip-shard';
+      shard.style.left = (rect.left + rect.width / 2) + 'px';
+      shard.style.top = (rect.top + rect.height / 2) + 'px';
+      shard.style.background = colors[i % colors.length];
+      const angle = (i / shards) * Math.PI * 2;
+      const dist = 60 + Math.random() * 80;
+      shard.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+      shard.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+      shard.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+      shard.style.animationDelay = (i * 0.04) + 's';
+      layer.appendChild(shard);
+      shard.addEventListener('animationend', () => shard.remove());
+    }
+  }
+
+  function animateChipBet(sourceEl) {
+    const layer = $('chip-anim-layer');
+    const potEl = $('pot-display');
+    if (!layer || !sourceEl || !potEl) return;
+    const srcRect = sourceEl.getBoundingClientRect();
+    const potRect = potEl.getBoundingClientRect();
+    const tx = (potRect.left + potRect.width / 2) - (srcRect.left + srcRect.width / 2);
+    const ty = (potRect.top + potRect.height / 2) - (srcRect.top + srcRect.height / 2);
+    for (let i = 0; i < 3; i++) {
+      const coin = document.createElement('div');
+      coin.className = 'coin-to-pot';
+      coin.textContent = '🪙';
+      coin.style.left = (srcRect.left + srcRect.width / 2) + 'px';
+      coin.style.top = (srcRect.top + srcRect.height / 2) + 'px';
+      coin.style.setProperty('--tx', (tx + (Math.random() - 0.5) * 20) + 'px');
+      coin.style.setProperty('--ty', (ty + (Math.random() - 0.5) * 20) + 'px');
+      coin.style.animationDelay = (i * 0.1) + 's';
+      layer.appendChild(coin);
+      coin.addEventListener('animationend', () => coin.remove());
+    }
+  }
+
+  // Track chip changes and trigger animations
+  function trackChipChanges(state) {
+    if (!state || !state.players) return;
+    state.players.forEach((p, idx) => {
+      const prev = previousChips[p.id];
+      if (prev !== undefined && prev !== p.chips) {
+        const diff = p.chips - prev;
+        // Find the DOM element for this player
+        let targetEl = null;
+        if (p.id === myId) {
+          targetEl = $('my-chips');
+        } else {
+          const oppSlots = document.querySelectorAll('.opponent-slot');
+          // Match by index in the players array
+          oppSlots.forEach(slot => {
+            const nameEl = slot.querySelector('.opp-name');
+            if (nameEl && nameEl.textContent.includes(p.name)) {
+              targetEl = slot;
+            }
+          });
+        }
+        if (targetEl) {
+          if (diff > 0) {
+            animateChipWin(targetEl, Math.ceil(diff / 20));
+          } else if (diff < 0 && state.phase === 'showdown') {
+            animateChipLoss(targetEl, Math.abs(diff));
+          }
+        }
+      }
+      previousChips[p.id] = p.chips;
+    });
+  }
+
+  // 6. Streak & Rare Hand Highlights
+  function applyStreakHighlight(state, me) {
+    if (!me || !state) return;
+    const myArea = document.querySelector('.my-area');
+    if (!myArea) return;
+
+    // Remove existing streak classes
+    myArea.classList.remove('streak-bronze', 'streak-silver', 'streak-gold');
+
+    const streak = winStreaks[me.id] || 0;
+    if (streak >= 5) {
+      myArea.classList.add('streak-gold');
+    } else if (streak >= 3) {
+      myArea.classList.add('streak-silver');
+    } else if (streak >= 2) {
+      myArea.classList.add('streak-bronze');
+    }
+  }
+
+  function applyRareHandHighlight(state, me) {
+    if (!me || !me.bestHand) return;
+    const rank = me.bestHand.rank;
+    const myCards = $('my-cards');
+    if (!myCards) return;
+
+    // Remove existing rare highlights
+    myCards.classList.remove('rare-highlight-legendary', 'rare-highlight-elite', 'rare-highlight-squad');
+    myCards.querySelectorAll('.rare-glow-sprite').forEach(el => el.classList.remove('rare-glow-sprite'));
+
+    // rank 9 = Legendary Lineup (best hand), rank 8 = Elite Four, rank 7 = Evolution Chain
+    if (rank >= 9) {
+      myCards.classList.add('rare-highlight-legendary');
+      myCards.querySelectorAll('.poke-sprite').forEach(el => el.classList.add('rare-glow-sprite'));
+    } else if (rank >= 7) {
+      myCards.classList.add('rare-highlight-elite');
+    } else if (rank >= 5) {
+      myCards.classList.add('rare-highlight-squad');
+    }
+  }
+
+  // 7. Active Turn Glow
+  function applyTurnGlow(state, me) {
+    // Remove existing turn glow
+    document.querySelectorAll('.active-turn-glow').forEach(el => el.classList.remove('active-turn-glow'));
+    document.querySelectorAll('.action-urgent').forEach(el => el.classList.remove('action-urgent'));
+
+    if (!state || !me || state.phase === 'waiting' || state.phase === 'showdown') return;
+
+    const isMyTurn = state.players[state.turnIndex]?.id === myId;
+
+    if (isMyTurn) {
+      // Add glow to my hand cards
+      const myCards = $('my-cards');
+      if (myCards) {
+        myCards.querySelectorAll('.poke-mon').forEach(el => el.classList.add('active-turn-glow'));
+      }
+
+      // Add urgency pulse to action panel
+      const actionPanel = $('action-panel');
+      if (actionPanel && !actionPanel.classList.contains('hidden')) {
+        actionPanel.classList.add('action-urgent');
+      }
+    }
+  }
+
+  // 8. Showdown VFX: Winner light pillar + particles
+  function addWinnerLightPillar(containerEl) {
+    if (!containerEl) return;
+    containerEl.style.position = 'relative';
+    containerEl.style.overflow = 'visible';
+
+    const pillar = document.createElement('div');
+    pillar.className = 'winner-light-pillar';
+    containerEl.appendChild(pillar);
+
+    // Pillar particles
+    const particles = ['✨', '⭐', '💫', '🌟', '★'];
+    for (let i = 0; i < 10; i++) {
+      const p = document.createElement('div');
+      p.className = 'pillar-particle';
+      p.textContent = particles[i % particles.length];
+      p.style.left = (20 + Math.random() * 60) + '%';
+      p.style.bottom = (Math.random() * 60) + '%';
+      const tx = (Math.random() - 0.5) * 100 + 'px';
+      const ty = -(50 + Math.random() * 100) + 'px';
+      p.style.setProperty('--tx', tx);
+      p.style.setProperty('--ty', ty);
+      p.style.animationDelay = (0.5 + i * 0.2) + 's';
+      containerEl.appendChild(p);
+      p.addEventListener('animationend', () => p.remove());
+    }
+  }
+
+  // 8. Tournament collision shockwave
+  function addCollisionShockwave(containerEl) {
+    if (!containerEl) return;
+    // Shockwave rings
+    for (let i = 0; i < 3; i++) {
+      const wave = document.createElement('div');
+      wave.className = 'collision-wave';
+      wave.style.animationDelay = (i * 0.2) + 's';
+      containerEl.appendChild(wave);
+      wave.addEventListener('animationend', () => wave.remove());
+    }
+    // Rays
+    for (let i = 0; i < 8; i++) {
+      const ray = document.createElement('div');
+      ray.className = 'collision-ray';
+      ray.style.setProperty('--angle', (i * 45) + 'deg');
+      ray.style.animationDelay = '0.1s';
+      containerEl.appendChild(ray);
+      ray.addEventListener('animationend', () => ray.remove());
+    }
+  }
+
+  // 8. Champion enhancements
+  function enhanceChampionOverlay(champBox) {
+    if (!champBox) return;
+    champBox.style.position = 'relative';
+    champBox.style.overflow = 'visible';
+
+    // Add rotating halos
+    const halo = document.createElement('div');
+    halo.className = 'champion-halo';
+    champBox.appendChild(halo);
+
+    const haloInner = document.createElement('div');
+    haloInner.className = 'champion-halo-inner';
+    champBox.appendChild(haloInner);
+
+    // Golden bubbles rising from bottom
+    for (let i = 0; i < 15; i++) {
+      const bubble = document.createElement('div');
+      bubble.className = 'golden-bubble';
+      bubble.style.left = (Math.random() * 100) + '%';
+      bubble.style.setProperty('--duration', (3 + Math.random() * 4) + 's');
+      bubble.style.animationDelay = (Math.random() * 3) + 's';
+      bubble.style.width = (4 + Math.random() * 8) + 'px';
+      bubble.style.height = bubble.style.width;
+      champBox.appendChild(bubble);
+    }
+
+    // Apply gradient flow to title
+    const champTitle = $('champ-title');
+    if (champTitle) champTitle.classList.add('gradient-flow-text');
+  }
 
   // ─── Boot ─────────────────────────────────────────────────────────────────────
   applyI18n();

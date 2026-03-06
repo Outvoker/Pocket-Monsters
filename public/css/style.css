@@ -3230,3 +3230,604 @@ input[type="text"]:focus, input[type="number"]:focus {
     font-size: clamp(18px, 4vw, 36px);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   ENHANCED BATTLE EFFECTS — VFX System
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 2. Screen Shake & Flash (screen-shake-flash) ──────────────────────────── */
+@keyframes screen-shake {
+  0%   { transform: translate(0, 0); }
+  10%  { transform: translate(-6px, 4px); }
+  20%  { transform: translate(5px, -6px); }
+  30%  { transform: translate(-8px, -3px); }
+  40%  { transform: translate(7px, 5px); }
+  50%  { transform: translate(-4px, -7px); }
+  60%  { transform: translate(6px, 3px); }
+  70%  { transform: translate(-5px, 6px); }
+  80%  { transform: translate(4px, -4px); }
+  90%  { transform: translate(-3px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+
+.screen-shaking {
+  animation: screen-shake 0.6s ease-out !important;
+}
+
+.screen-flash {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  z-index: 9990;
+  pointer-events: none;
+  animation: flash-white 0.4s ease-out forwards;
+}
+
+@keyframes flash-white {
+  0%   { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+.screen-flash.hidden { display: none !important; }
+
+/* ── 3. Skill Effect Overlay (type-skill-effects) ──────────────────────────── */
+.skill-effect-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  overflow: hidden;
+}
+
+/* Fire Vortex */
+@keyframes fire-vortex {
+  0%   { transform: translate(-50%, 100%) rotate(0deg) scale(0.3); opacity: 0; }
+  20%  { opacity: 0.9; }
+  50%  { transform: translate(-50%, -20%) rotate(360deg) scale(1.2); opacity: 0.8; }
+  80%  { transform: translate(-50%, -60%) rotate(720deg) scale(0.8); opacity: 0.4; }
+  100% { transform: translate(-50%, -100%) rotate(1080deg) scale(0.2); opacity: 0; }
+}
+
+.skill-fire-particle {
+  position: absolute;
+  bottom: -10%;
+  width: 60px;
+  height: 80px;
+  background: radial-gradient(ellipse at center bottom, rgba(255,255,200,1) 0%, rgba(255,140,0,0.9) 40%, rgba(255,69,0,0.6) 70%, transparent 100%);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  filter: blur(3px);
+  animation: fire-vortex 1.8s ease-out forwards;
+}
+
+/* Water Cannon */
+@keyframes water-cannon-left {
+  0%   { transform: translateX(-120vw) scaleX(0.5); opacity: 0; }
+  30%  { opacity: 0.9; }
+  60%  { transform: translateX(0) scaleX(1.2); opacity: 0.8; }
+  100% { transform: translateX(30vw) scaleX(0.3); opacity: 0; }
+}
+@keyframes water-cannon-right {
+  0%   { transform: translateX(120vw) scaleX(0.5); opacity: 0; }
+  30%  { opacity: 0.9; }
+  60%  { transform: translateX(0) scaleX(1.2); opacity: 0.8; }
+  100% { transform: translateX(-30vw) scaleX(0.3); opacity: 0; }
+}
+
+.skill-water-particle {
+  position: absolute;
+  top: 50%;
+  width: 40vw;
+  height: 80px;
+  background: linear-gradient(to top, rgba(41,182,246,0.9) 0%, rgba(3,169,244,0.6) 50%, transparent 100%);
+  border-radius: 50%;
+  filter: blur(4px);
+}
+.skill-water-particle.from-left  { left: 0;   animation: water-cannon-left 1.6s ease-out forwards; }
+.skill-water-particle.from-right { right: 0;  animation: water-cannon-right 1.6s ease-out forwards; }
+
+/* Water splash at collision */
+@keyframes water-splash {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  50%  { transform: translate(-50%, -50%) scale(2); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+}
+.skill-water-splash {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(41,182,246,0.7) 40%, transparent 70%);
+  animation: water-splash 0.8s ease-out 0.5s forwards;
+  opacity: 0;
+}
+
+/* Leaf Storm */
+@keyframes leaf-storm {
+  0%   { transform: translate(var(--sx), var(--sy)) rotate(0deg) scale(0.3); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate(0, 0) rotate(540deg) scale(1); opacity: 0.9; }
+  100% { transform: translate(calc(var(--sx) * -0.5), calc(var(--sy) * -0.5)) rotate(1080deg) scale(0.1); opacity: 0; }
+}
+
+.skill-grass-particle {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 30px; height: 45px;
+  background: linear-gradient(135deg, rgba(102,187,106,0.9) 0%, rgba(56,142,60,0.8) 100%);
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  animation: leaf-storm 1.8s ease-in-out forwards;
+}
+
+/* Thunderbolt */
+@keyframes thunderbolt-strike {
+  0%   { clip-path: polygon(50% 0%, 50% 0%, 50% 0%, 50% 0%); opacity: 0; }
+  5%   { clip-path: polygon(45% 0%, 55% 0%, 60% 100%, 40% 100%); opacity: 1; }
+  10%  { opacity: 1; }
+  15%  { opacity: 0.3; }
+  20%  { opacity: 1; }
+  30%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes electric-ball {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  30%  { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
+  60%  { transform: translate(-50%, -50%) scale(2); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+}
+
+.skill-electric-bolt {
+  position: absolute;
+  left: 50%; top: 0;
+  width: 25px; height: 100vh;
+  background: linear-gradient(to bottom, rgba(255,255,255,1) 0%, rgba(255,235,59,0.9) 30%, rgba(255,214,0,0.8) 100%);
+  clip-path: polygon(48% 0%,52% 0%,55% 25%,60% 25%,42% 50%,55% 50%,40% 100%,45% 100%,52% 50%,42% 50%,55% 25%,48% 25%);
+  animation: thunderbolt-strike 1.2s ease-out forwards;
+  filter: blur(1px) drop-shadow(0 0 15px rgba(255,235,59,0.9));
+}
+.skill-electric-ball {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,235,59,0.8) 30%, rgba(255,214,0,0.5) 60%, transparent 100%);
+  animation: electric-ball 1s ease-out 0.3s forwards;
+  opacity: 0;
+}
+
+/* ── 4. Phase Transition Effects ───────────────────────────────────────────── */
+@keyframes pokeball-spin-open {
+  0%   { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 0.2; }
+  40%  { transform: translate(-50%, -50%) rotate(360deg) scale(1.8); opacity: 0.8; }
+  70%  { transform: translate(-50%, -50%) rotate(540deg) scale(2.2); opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) rotate(720deg) scale(1); opacity: 0.2; }
+}
+@keyframes pokeball-pulse {
+  0%   { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 0.2; }
+  30%  { transform: translate(-50%, -50%) rotate(180deg) scale(2.5); opacity: 0.9; }
+  50%  { transform: translate(-50%, -50%) rotate(360deg) scale(3); opacity: 0.6; }
+  70%  { transform: translate(-50%, -50%) rotate(540deg) scale(2); opacity: 0.3; }
+  100% { transform: translate(-50%, -50%) rotate(720deg) scale(1); opacity: 0.2; }
+}
+
+.pokeball-transitioning {
+  animation: pokeball-spin-open 1s ease-in-out !important;
+  opacity: 0.8 !important;
+}
+.pokeball-transitioning-strong {
+  animation: pokeball-pulse 1.2s ease-in-out !important;
+  opacity: 0.9 !important;
+}
+
+@keyframes ring-expand {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+}
+.phase-ring {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,215,0,0.7);
+  animation: ring-expand 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes energy-lines {
+  0%   { transform: scaleX(0); opacity: 0; }
+  30%  { transform: scaleX(1); opacity: 0.8; }
+  100% { transform: scaleX(1.5); opacity: 0; }
+}
+.phase-energy-line {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255,215,0,0.8), transparent);
+  animation: energy-lines 0.6s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes phase-bounce-in {
+  0%   { transform: scale(0); opacity: 0; }
+  50%  { transform: scale(1.15); opacity: 1; }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.phase-banner-animating .phase-badge-big {
+  animation: phase-bounce-in 0.5s cubic-bezier(0.34,1.56,0.64,1) !important;
+}
+
+.phase-flash {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(255,215,0,0.4) 0%, transparent 70%);
+  z-index: 89;
+  pointer-events: none;
+  animation: flash-white 0.6s ease-out forwards;
+}
+.phase-flash.hidden { display: none !important; }
+
+/* ── 5. Chip Animations ────────────────────────────────────────────────────── */
+.chip-anim-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 95;
+}
+
+@keyframes coin-fly-in {
+  0%   { transform: translate(var(--from-x), var(--from-y)) scale(0.5) rotate(0deg); opacity: 1; }
+  60%  { transform: translate(calc(var(--to-x) + 10px), calc(var(--to-y) - 30px)) scale(1.2) rotate(180deg); opacity: 1; }
+  100% { transform: translate(var(--to-x), var(--to-y)) scale(1) rotate(360deg); opacity: 0.8; }
+}
+.coin-particle {
+  position: absolute;
+  left: 0; top: 0;
+  font-size: 20px;
+  animation: coin-fly-in var(--duration, 0.8s) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  pointer-events: none;
+}
+
+@keyframes chip-shatter {
+  0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0.3) rotate(var(--rot)); opacity: 0; }
+}
+.chip-shard {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  animation: chip-shatter 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes coin-fly-to-pot {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0.6); opacity: 0.3; }
+}
+.coin-to-pot {
+  position: absolute;
+  font-size: 16px;
+  animation: coin-fly-to-pot 0.4s ease-in forwards;
+  pointer-events: none;
+}
+
+/* ── 6. Streak & Rare Hand Highlights ──────────────────────────────────────── */
+@keyframes streak-pulse-bronze {
+  0%, 100% { box-shadow: 0 0 8px rgba(205,127,50,0.3), inset 0 0 8px rgba(205,127,50,0.1); }
+  50%      { box-shadow: 0 0 20px rgba(205,127,50,0.6), inset 0 0 15px rgba(205,127,50,0.2); }
+}
+@keyframes streak-pulse-silver {
+  0%, 100% { box-shadow: 0 0 10px rgba(192,192,192,0.4), inset 0 0 10px rgba(192,192,192,0.1); }
+  50%      { box-shadow: 0 0 25px rgba(192,192,192,0.7), inset 0 0 20px rgba(192,192,192,0.2); }
+}
+@keyframes streak-pulse-gold {
+  0%, 100% { box-shadow: 0 0 12px rgba(255,215,0,0.4), inset 0 0 12px rgba(255,215,0,0.15); }
+  50%      { box-shadow: 0 0 35px rgba(255,215,0,0.8), inset 0 0 25px rgba(255,215,0,0.3); }
+}
+
+.streak-bronze { 
+  border-color: #cd7f32 !important;
+  animation: streak-pulse-bronze 2s ease-in-out infinite !important;
+}
+.streak-silver {
+  border-color: #c0c0c0 !important;
+  animation: streak-pulse-silver 1.5s ease-in-out infinite !important;
+}
+.streak-gold {
+  border-color: #ffd700 !important;
+  animation: streak-pulse-gold 1.2s ease-in-out infinite !important;
+}
+
+/* Rare hand highlights */
+@keyframes rainbow-wave {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+@keyframes stardust-burst {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1); opacity: 0; }
+}
+
+.rare-highlight-legendary {
+  position: relative;
+  overflow: visible;
+}
+.rare-highlight-legendary::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff0000, #ff7700, #ffff00, #00ff00, #0000ff, #8b00ff, #ff0000);
+  background-size: 200% 100%;
+  animation: rainbow-wave 2s linear infinite;
+  z-index: -1;
+  filter: blur(8px);
+  opacity: 0.7;
+}
+
+@keyframes elite-lightning {
+  0%, 100% { box-shadow: 0 0 15px rgba(255,215,0,0.5); }
+  25%  { box-shadow: 0 0 30px rgba(255,215,0,0.9), 0 -40px 30px rgba(255,215,0,0.3); }
+  50%  { box-shadow: 0 0 20px rgba(255,215,0,0.6); }
+  75%  { box-shadow: 0 0 35px rgba(255,215,0,1), 0 -50px 40px rgba(255,215,0,0.4); }
+}
+.rare-highlight-elite {
+  animation: elite-lightning 1.5s ease-in-out infinite !important;
+}
+
+@keyframes squad-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(30,136,229,0.4); }
+  50%      { box-shadow: 0 0 25px rgba(30,136,229,0.8), 0 0 50px rgba(30,136,229,0.3); }
+}
+.rare-highlight-squad {
+  animation: squad-pulse 1.5s ease-in-out infinite !important;
+}
+
+/* Rare hand glow on sprite images */
+.rare-glow-sprite {
+  filter: drop-shadow(0 0 12px rgba(255,215,0,1)) brightness(1.2) !important;
+  animation: best-pulse 1s ease-in-out infinite !important;
+}
+
+/* ── 7. Active Turn Glow ───────────────────────────────────────────────────── */
+@keyframes turn-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,215,0,0.3), 0 0 16px rgba(255,215,0,0.1); }
+  50%      { box-shadow: 0 0 20px rgba(255,215,0,0.8), 0 0 40px rgba(255,215,0,0.3); }
+}
+
+.poke-mon.active-turn-glow .poke-mon-sprite-wrap {
+  animation: turn-pulse 1.5s ease-in-out infinite !important;
+}
+
+/* Enhanced opponent turn indicator */
+@keyframes opp-turn-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,215,0,0.3); border-color: var(--gold); }
+  50%      { box-shadow: 0 0 20px rgba(255,215,0,0.7), 0 0 40px rgba(255,215,0,0.2); border-color: #fff; }
+}
+.opponent-slot.is-turn {
+  animation: opp-turn-glow 1.2s ease-in-out infinite;
+}
+
+/* Action urgency */
+@keyframes urgent-blink {
+  0%, 100% { border-color: rgba(239,83,80,0.3); box-shadow: none; }
+  50%      { border-color: rgba(239,83,80,1); box-shadow: 0 0 15px rgba(239,83,80,0.5); }
+}
+.action-urgent {
+  animation: urgent-blink 0.8s ease-in-out infinite !important;
+  border-color: rgba(239,83,80,0.6) !important;
+}
+
+/* ── 8. Showdown VFX Enhance ───────────────────────────────────────────────── */
+/* Winner light pillar */
+@keyframes light-pillar-rise {
+  0%   { height: 0; opacity: 0; }
+  30%  { height: 100%; opacity: 0.8; }
+  100% { height: 100%; opacity: 0.4; }
+}
+@keyframes pillar-sway {
+  0%, 100% { transform: translateX(-50%) skewX(-2deg); }
+  50%      { transform: translateX(-50%) skewX(2deg); }
+}
+.winner-light-pillar {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 140%;
+  height: 0;
+  background: linear-gradient(to top, rgba(255,215,0,0.5) 0%, rgba(255,255,255,0.25) 40%, transparent 100%);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 0;
+  animation: light-pillar-rise 2s ease-out forwards, pillar-sway 3s ease-in-out 2s infinite;
+  filter: blur(12px);
+}
+
+/* Pillar particles */
+@keyframes pillar-particle-burst {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0.3); opacity: 0; }
+}
+.pillar-particle {
+  position: absolute;
+  pointer-events: none;
+  font-size: 16px;
+  animation: pillar-particle-burst 1.5s ease-out forwards;
+}
+
+/* Loser fade */
+@keyframes desaturate-shrink {
+  0%   { filter: saturate(1); transform: scale(1); opacity: 1; }
+  100% { filter: saturate(0.3); transform: scale(0.95); opacity: 0.6; }
+}
+.loser-fade {
+  animation: desaturate-shrink 0.8s ease-out forwards;
+}
+
+/* Tournament collision shockwave */
+@keyframes collision-shockwave {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 1; border-width: 4px; }
+  100% { transform: translate(-50%, -50%) scale(5); opacity: 0; border-width: 1px; }
+}
+@keyframes collision-ray {
+  0%   { transform: translate(-50%, -50%) rotate(var(--angle)) scaleY(0); opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(var(--angle)) scaleY(3); opacity: 0; }
+}
+.collision-wave {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  border: 4px solid rgba(255,215,0,0.8);
+  background: transparent;
+  pointer-events: none;
+  animation: collision-shockwave 0.8s ease-out forwards;
+}
+.collision-ray {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 3px; height: 40px;
+  background: linear-gradient(to top, rgba(255,215,0,0.8), transparent);
+  transform-origin: bottom center;
+  pointer-events: none;
+  animation: collision-ray 0.6s ease-out forwards;
+}
+
+/* Champion enhancements */
+@keyframes champion-halo-rotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+.champion-halo {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 200%; height: 200%;
+  border-radius: 50%;
+  border: 2px dashed rgba(255,215,0,0.3);
+  pointer-events: none;
+  animation: champion-halo-rotate 8s linear infinite;
+}
+.champion-halo-inner {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 150%; height: 150%;
+  border-radius: 50%;
+  border: 1px solid rgba(255,215,0,0.2);
+  pointer-events: none;
+  animation: champion-halo-rotate 5s linear infinite reverse;
+}
+
+@keyframes golden-bubble-rise {
+  0%   { transform: translateY(0) scale(1); opacity: 0.8; }
+  100% { transform: translateY(-100vh) scale(0.5); opacity: 0; }
+}
+.golden-bubble {
+  position: absolute;
+  bottom: 0;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,215,0,0.8) 0%, rgba(255,215,0,0.3) 100%);
+  animation: golden-bubble-rise var(--duration, 4s) ease-out forwards;
+  pointer-events: none;
+}
+
+/* ── Standalone Pokeball VFX (card entry + battle start) ───────────────────── */
+.pokeball-vfx {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+}
+.pokeball-vfx-top {
+  position: absolute; width: 100%; height: 48%;
+  background: #e53935; border-radius: 120px 120px 0 0; top: 0;
+}
+.pokeball-vfx-bottom {
+  position: absolute; width: 100%; height: 48%;
+  background: #fafafa; border-radius: 0 0 120px 120px; bottom: 0;
+}
+.pokeball-vfx-mid {
+  position: absolute; width: 100%; height: 6%; background: #222; top: 47%;
+}
+.pokeball-vfx-btn {
+  position: absolute; width: 28px; height: 28px;
+  background: #fafafa; border: 5px solid #222;
+  border-radius: 50%; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+}
+.pokeball-vfx-btn::after {
+  content: ''; position: absolute;
+  width: 10px; height: 10px; background: #fff;
+  border-radius: 50%; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px 2px rgba(255,255,255,0.8);
+}
+
+/* Card entry pokeball: spin in, flash, then fade out */
+.pokeball-vfx.pokeball-entry-anim {
+  animation: pokeball-entry 0.8s cubic-bezier(.34,1.2,.64,1) forwards;
+}
+@keyframes pokeball-entry {
+  0%   { transform: translate(-50%,-50%) scale(0) rotate(0deg); opacity: 0; }
+  25%  { transform: translate(-50%,-50%) scale(1.6) rotate(180deg); opacity: 1; }
+  50%  { transform: translate(-50%,-50%) scale(1.8) rotate(360deg); opacity: 1; }
+  70%  { transform: translate(-50%,-50%) scale(2.2) rotate(450deg); opacity: 0.9; }
+  85%  { transform: translate(-50%,-50%) scale(2.5) rotate(500deg); opacity: 0.5; }
+  100% { transform: translate(-50%,-50%) scale(3) rotate(540deg); opacity: 0; }
+}
+.pokeball-vfx.pokeball-entry-anim .pokeball-vfx-btn::after {
+  animation: pokeball-btn-flash 0.8s ease-out forwards;
+}
+@keyframes pokeball-btn-flash {
+  0%   { box-shadow: 0 0 6px 2px rgba(255,255,255,0.8); }
+  40%  { box-shadow: 0 0 30px 15px rgba(255,255,255,1); }
+  100% { box-shadow: 0 0 60px 30px rgba(255,255,255,0); }
+}
+
+/* Battle start pokeball: bigger, slower, more dramatic */
+.pokeball-vfx.pokeball-battle-anim {
+  animation: pokeball-battle 1.2s cubic-bezier(.34,1.2,.64,1) forwards;
+}
+@keyframes pokeball-battle {
+  0%   { transform: translate(-50%,-50%) scale(0) rotate(0deg); opacity: 0; }
+  15%  { transform: translate(-50%,-50%) scale(2) rotate(120deg); opacity: 1; }
+  35%  { transform: translate(-50%,-50%) scale(2.5) rotate(360deg); opacity: 1; }
+  55%  { transform: translate(-50%,-50%) scale(3) rotate(540deg); opacity: 1;
+         filter: brightness(1.5); }
+  75%  { transform: translate(-50%,-50%) scale(4) rotate(660deg); opacity: 0.8;
+         filter: brightness(2); }
+  100% { transform: translate(-50%,-50%) scale(6) rotate(720deg); opacity: 0;
+         filter: brightness(3); }
+}
+
+/* Flash ring that expands from pokeball center */
+.pokeball-flash-ring {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.9);
+  box-shadow: 0 0 20px 5px rgba(255,255,255,0.6), inset 0 0 20px 5px rgba(255,255,255,0.3);
+  pointer-events: none;
+  animation: pokeball-ring-expand 0.6s ease-out forwards;
+}
+@keyframes pokeball-ring-expand {
+  0%   { transform: translate(-50%,-50%) scale(0); opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(12); opacity: 0; }
+}
+
+@keyframes gradient-flow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.gradient-flow-text {
+  background: linear-gradient(90deg, #ffd700, #fff, #ffd700, #ff8c00, #ffd700);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-flow 3s linear infinite;
+}
