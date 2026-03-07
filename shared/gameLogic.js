@@ -235,6 +235,42 @@ function compareHandResult(a, b) {
   return 0;
 }
 
+// ─── Draw detection helpers (for bot AI) ─────────────────────────────────────
+function countFlushDraw(cards) {
+  const typeCounts = {};
+  for (const c of cards) typeCounts[c.type] = (typeCounts[c.type] || 0) + 1;
+  let bestType = null, bestCount = 0;
+  for (const [type, count] of Object.entries(typeCounts)) {
+    if (count > bestCount) { bestType = type; bestCount = count; }
+  }
+  return { type: bestType, count: bestCount };
+}
+
+function countStraightDraw(cards) {
+  const uniqueVals = [...new Set(cards.map(c => c.value))].sort((a, b) => a - b);
+  if (uniqueVals.length < 4) return { type: 'none', count: 0 };
+
+  let bestRun = 1, run = 1, bestGaps = 0, gaps = 0;
+  // Slide through sorted unique values looking for near-consecutive runs
+  for (let i = 1; i < uniqueVals.length; i++) {
+    const diff = uniqueVals[i] - uniqueVals[i - 1];
+    if (diff === 1) {
+      run++;
+    } else if (diff === 2 && gaps === 0) {
+      run++; gaps++;
+    } else {
+      if (run > bestRun) { bestRun = run; bestGaps = gaps; }
+      run = 1; gaps = 0;
+    }
+  }
+  if (run > bestRun) { bestRun = run; bestGaps = gaps; }
+
+  if (bestRun >= 5) return { type: 'made', count: 5 };
+  if (bestRun === 4 && bestGaps === 0) return { type: 'open-ended', count: 4 };
+  if (bestRun === 4 && bestGaps === 1) return { type: 'gutshot', count: 4 };
+  return { type: 'none', count: 0 };
+}
+
 // ─── Game phases ──────────────────────────────────────────────────────────────
 const PHASES = {
   WAITING:  'waiting',
@@ -262,6 +298,7 @@ function spriteUrl(pokemonId) {
 const GameLogic = {
   TYPES, POKEMON_DATA, HAND_RANKS, RANK_MAP, PHASES, ACTIONS,
   buildDeck, shuffle, evaluateBestHand, evaluateHand, spriteUrl, compareHandResult,
+  countFlushDraw, countStraightDraw,
 };
 
 if (typeof module !== 'undefined' && module.exports) {

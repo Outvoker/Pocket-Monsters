@@ -630,6 +630,64 @@ input[type="text"]:focus, input[type="number"]:focus {
   border-radius: 20px;
   padding: 3px 14px;
 }
+.pot-main {
+  font-size: 13px;
+  color: var(--gold);
+}
+.pot-sides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin-top: 2px;
+}
+.pot-side-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: #b0bec5;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+.pot-total {
+  font-size: 10px;
+  color: rgba(255,215,0,.6);
+  margin-top: 2px;
+}
+.pot-breakdown {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pot-breakdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.05);
+}
+.pot-breakdown-item.pot-main-item {
+  background: rgba(255,215,0,.1);
+  border: 1px solid rgba(255,215,0,.25);
+  color: var(--gold);
+}
+.pot-breakdown-item .pot-label {
+  font-weight: 700;
+  min-width: 60px;
+}
+.pot-breakdown-item .pot-amount {
+  color: var(--gold);
+  font-weight: 700;
+}
+.pot-breakdown-item .pot-winners {
+  color: #81c784;
+  font-size: 10px;
+}
 
 /* My area */
 .my-area {

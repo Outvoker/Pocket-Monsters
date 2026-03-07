@@ -65,6 +65,9 @@
       communityLabel: '对战场地',
       leaderboard:    '🏆 训练家殿堂',
       helpManual:     '📖 精灵图鉴',
+      mainPot:        '主池',
+      sidePot:        n => `边池 ${n}`,
+      potWinner:      (name, amount) => `${name} 赢得 ${amount}`,
     },
     en: {
       subtitle:       'Assemble your strongest team and battle!',
@@ -124,6 +127,9 @@
       communityLabel: 'Field',
       leaderboard:    '🏆 Hall of Fame',
       helpManual:     '📖 Pokédex',
+      mainPot:        'Main Pot',
+      sidePot:        n => `Side Pot ${n}`,
+      potWinner:      (name, amount) => `${name} wins ${amount}`,
     },
   };
 
@@ -176,6 +182,8 @@
   const queuedCardKeys = new Set();
   // track last phase to detect phase changes
   let lastPhase = null;
+  // buffer game_state received while card entry animations are playing
+  let pendingGameState = null;
 
   // ─── Sound Effects for Pokemon Types ──────────────────────────────────────────
   let audioContext = null;
@@ -682,6 +690,12 @@
     if (state.finalChampion) {
       showFinalChampion(state);
     } else if (state.phase === 'showdown' && state.winners && state.winners.length) {
+      // Guard: defer showdown/tournament animations until card entry animations finish
+      if (isPlayingCardEntry || cardEntryQueue.length > 0) {
+        pendingGameState = state;
+        return;
+      }
+
       // Reset animation state for each new round
       if (state.roundCount !== lastShowdownRound) {
         lastShowdownRound = state.roundCount;
@@ -706,6 +720,12 @@
 
   // ─── Community cards ─────────────────────────────────────────────────────────
   function renderCommunity(state) {
+    // Guard: defer DOM updates while card entry animations are playing
+    if (isPlayingCardEntry || cardEntryQueue.length > 0) {
+      pendingGameState = state;
+      return;
+    }
+
     const cards  = state.community || [];
     const el     = $('community-cards');
     const me     = state.players.find(p => p.id === myId);
@@ -1181,9 +1201,9 @@
       // VFX: Screen shake on collision
       triggerScreenShake();
 
-      // VFX: Collision shockwave at center
-      const tournBox = document.querySelector('.tournament-box');
-      if (tournBox) addCollisionShockwave(tournBox);
+      // VFX: Collision shockwave at center of players area
+      const tournPlayers = document.querySelector('.tournament-players');
+      if (tournPlayers) addCollisionShockwave(tournPlayers);
     }, 3500);
     
     // Phase 4: Apply winner/loser effects (at 4.5s)
@@ -1819,6 +1839,13 @@
     }
     
     isPlayingCardEntry = false;
+
+    // After queue drains, apply any buffered game_state
+    if (pendingGameState) {
+      const buffered = pendingGameState;
+      pendingGameState = null;
+      renderGame(buffered);
+    }
   }
 
   function queueCardEntry(card, targetContainer, targetIndex, isHand = false) {
